@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Máy Tính Đại Số Tuyến Tính</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-['Be_Vietnam_Pro']">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Máy Tính Đại Số Tuyến Tính</h1>
+        </header>
+
+        <main class="bg-white p-6 rounded-2xl shadow-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                    <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
+                </div>
+                <div>
+                    <label for="matrix-b-input" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
+                    <textarea id="matrix-b-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7&#10;8"></textarea>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">SVD</button>
+                <button id="calculate-gauss-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Gauss</button>
+                <button id="calculate-gj-btn" class="action-btn bg-green-600 hover:bg-green-700">Gauss-Jordan</button>
+                <button id="calculate-lu-btn" class="action-btn bg-orange-500 hover:bg-orange-600">LU</button>
+                <button id="calculate-cholesky-btn" class="action-btn bg-red-500 hover:bg-red-600">Cholesky</button>
+            </div>
+            
+            <hr/>
+
+            <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+            <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+            <div id="results-area"></div>
+        </main>
+        <footer class="text-center mt-8 text-gray-500 text-sm"><p>&copy; 2024 - Xây dựng bởi Gemini</p></footer>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
