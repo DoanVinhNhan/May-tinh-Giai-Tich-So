@@ -1,5 +1,10 @@
 import numpy as np
 
+def zero_small(x, tol=1e-15):
+    x = np.array(x)
+    x[np.abs(x) < tol] = 0.0
+    return x
+
 def solve_gauss_jordan(matrix_a, matrix_b):
     """
     Giải hệ phương trình tuyến tính AX = B bằng phương pháp khử Gauss-Jordan
@@ -115,7 +120,7 @@ def solve_gauss_jordan(matrix_a, matrix_b):
 
             return {
                 "success": True, "status": "unique_solution", "message": "Hệ phương trình có nghiệm duy nhất.",
-                "solution": solution.tolist(), "intermediate_steps": intermediate_steps
+                "solution": zero_small(solution).tolist(), "intermediate_steps": intermediate_steps
             }
             
     except Exception as e:

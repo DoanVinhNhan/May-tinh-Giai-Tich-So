@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const loadingSpinner = document.getElementById('loading-spinner');
     const errorMessage = document.getElementById('error-message');
 
+    // === GLOBAL STATE ===
+    let displayPrecision = 4; // Số chữ số sau dấu phẩy mặc định
+
     // === HELPER FUNCTIONS ===
     function parseMatrix(matrixString) {
         try {
@@ -29,16 +32,20 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function formatNumber(num) {
+        // Số nhỏ hơn 1e-15 coi là 0
         if (typeof num === 'object' && num !== null && num.hasOwnProperty('re') && num.hasOwnProperty('im')) {
-            if (Math.abs(num.im) < 1e-9) return num.re.toFixed(4);
+            if (Math.abs(num.im) < 1e-15) return Math.abs(num.re) < 1e-15 ? '0' : num.re.toFixed(displayPrecision);
             const sign = num.im < 0 ? ' -' : ' +';
-            return `${num.re.toFixed(4)}${sign} ${Math.abs(num.im).toFixed(4)}i`;
+            return `${Math.abs(num.re) < 1e-15 ? '0' : num.re.toFixed(displayPrecision)}${sign} ${Math.abs(num.im).toFixed(displayPrecision)}i`;
         }
-        if(typeof num === 'number') return num.toFixed(4);
+        if (typeof num === 'number') {
+            if (Math.abs(num) < 1e-15) return '0';
+            return num.toFixed(displayPrecision);
+        }
         return num;
     }
 
-    function formatMatrix(data, precision = 4) {
+    function formatMatrix(data, precision = displayPrecision) {
         if (!Array.isArray(data) || data.length === 0) return '';
         let tableHtml = '<table class="matrix-table">';
         data.forEach(row => {
@@ -73,18 +80,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
-            const result = await response.json();
+            // Kiểm tra response status trước khi parse JSON
+            if (!response.ok) {
+                const text = await response.text();
+                displayError(`Lỗi server (${response.status}): ${text}`);
+                return;
+            }
+            let result;
+            try {
+                result = await response.json();
+            } catch (jsonErr) {
+                displayError('Lỗi: Server trả về dữ liệu không phải JSON.');
+                return;
+            }
             resetDisplay();
             if (!result.success) {
                  displayError(result.error);
                  return;
             }
             const displayMap = {
-                'svd': displaySvdResults,
-                'gauss-jordan': displayGaussJordanResults,
-                'gauss-elimination': displayGaussEliminationResults,
-                'lu-decomposition': displayLuResults,
-                'cholesky': displayCholeskyResults
+                'svd': wrapDisplay(displaySvdResults),
+                'gauss-jordan': wrapDisplay(displayGaussJordanResults),
+                'gauss-elimination': wrapDisplay(displayGaussEliminationResults),
+                'lu-decomposition': wrapDisplay(displayLuResults),
+                'cholesky': wrapDisplay(displayCholeskyResults)
             };
             const key = endpoint.split('/').pop();
             if (displayMap[key]) {
@@ -93,8 +112,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (err) {
             resetDisplay();
-            displayError('Không thể kết nối đến máy chủ.');
+            displayError('Không thể kết nối đến máy chủ.\n' + err);
         }
+    }
+
+    // Ghi nhớ kết quả cuối cùng để render lại khi đổi precision
+    function wrapDisplay(fn) {
+        return function(result) {
+            window.lastResult = result;
+            window.lastDisplayFn = fn;
+            fn(result);
+        };
     }
 
     // === EVENT LISTENERS ===
@@ -163,12 +191,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function displaySvdResults(result) {
         let html = `<h3 class="result-heading">Kết Quả Phân Tích SVD (A = UΣVᵀ)</h3>`;
-        html += `
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 text-center">
-                <div><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
-                <div><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
-                <div><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
+        // Nếu số cột của U, Sigma, V^T lớn (ví dụ > 8), hiển thị dọc, còn lại giữ dạng lưới ngang
+        const uCols = result.U && result.U[0] ? result.U[0].length : 0;
+        const sigmaCols = result.Sigma && result.Sigma[0] ? result.Sigma[0].length : 0;
+        const vtCols = result.V_transpose && result.V_transpose[0] ? result.V_transpose[0].length : 0;
+        const isWide = uCols > 4 || sigmaCols > 4 || vtCols > 4;
+        if (isWide) {
+            html += `<div class="mb-8">
+                <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
+                <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
+                <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
             </div>`;
+        } else {
+            html += `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 text-center">
+                    <div><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
+                    <div><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
+                    <div><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
+                </div>`;
+        }
         if (result.intermediate_steps) {
             html += `
                 <div class="mt-10">
@@ -218,13 +259,53 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function displayLuResults(result) {
         let html = displayGenericHptResults('Kết Quả Giải Hệ Bằng Phân Tách LU', result);
-        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3>`;
-        html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-8">`;
-        html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận L</h4><div class="matrix-display">${formatMatrix(result.decomposition.L)}</div></div>`;
-        html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận U (với uᵢᵢ=1)</h4><div class="matrix-display">${formatMatrix(result.decomposition.U)}</div></div>`;
-        html += `</div>`;
-        html += `<div class="mt-6"><h4 class="font-medium text-center text-gray-700">Giải Ly = B, ta được ma trận Y:</h4><div class="matrix-display">${formatMatrix(result.intermediate_y)}</div></div>`;
-        html += `</div>`;
+        // Hiển thị L, U, P nếu có
+        if ((result.decomposition && (result.decomposition.L || result.decomposition.P)) || result.L) {
+            html += `<div class="mt-10"><h3 class="result-heading">Các Ma Trận L, U${result.decomposition?.P ? ', P' : ''}</h3>`;
+            html += `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`;
+            html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận L</h4><div class="matrix-display">${formatMatrix(result.decomposition?.L || result.L)}</div></div>`;
+            html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.decomposition?.U || result.U)}</div></div>`;
+            if (result.decomposition?.P) {
+                html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận P</h4><div class="matrix-display">${formatMatrix(result.decomposition.P)}</div></div>`;
+            }
+            html += `</div></div>`;
+        }
+        if (result.status === 'unique_solution') {
+            html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3>`;
+            if (result.intermediate_y) {
+                html += `<div class="mt-6"><h4 class="font-medium text-center text-gray-700">Giải Ly = PB, ta được ma trận Y:</h4><div class="matrix-display">${formatMatrix(result.intermediate_y)}</div></div>`;
+            }
+            html += `</div>`;
+            html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
+        } else if (result.status === 'infinite_solutions') {
+            // Xử lý nghiệm tổng quát dạng object hoặc array
+            let gs = result.general_solution;
+            let Xp = [];
+            let nullspace = [];
+            let num_free_vars = 0;
+            if (gs) {
+                Xp = gs.particular_solution || [];
+                nullspace = gs.null_space_vectors || [];
+                num_free_vars = (Array.isArray(nullspace) && nullspace.length > 0 && Array.isArray(nullspace[0])) ? nullspace[0].length : 0;
+            }
+            let termHtml = '';
+            for (let i = 0; i < num_free_vars; i++) {
+                const v_k = nullspace.map(row => [row[i]]);
+                termHtml += `&nbsp; + &nbsp; t<sub>${i+1}</sub> &nbsp; <div class="matrix-display !inline-block">${formatMatrix(v_k)}</div>`;
+            }
+            html += `
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center mb-4">
+                    <div class="flex justify-center items-center flex-wrap">
+                        <span class="text-2xl mr-4">X &nbsp; = </span>
+                        <div class="matrix-display !inline-block" title="Nghiệm riêng Xp">${formatMatrix(Xp)}</div>
+                        <div class="flex justify-center items-center flex-wrap">
+                            ${termHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+            html += `<p class="text-center text-sm text-gray-500 mt-2">Xp là nghiệm riêng (mỗi cột ứng với một vế phải), các ma trận cột sau là vector cơ sở của không gian null, và t<sub>k</sub> là các tham số tự do.</p>`;
+        }
         resultsArea.innerHTML = html;
     }
 
@@ -242,4 +323,44 @@ document.addEventListener('DOMContentLoaded', function () {
         html += `</div>`;
         resultsArea.innerHTML = html;
     }
+
+    // === UI FOR PRECISION SETTING ===
+    function createPrecisionSetting() {
+        const container = document.createElement('div');
+        container.className = 'flex items-center gap-2 mb-4';
+        container.innerHTML = `
+            <label for="precision-input" class="font-medium">Số chữ số sau dấu phẩy:</label>
+            <input id="precision-input" type="number" min="0" max="15" value="${displayPrecision}" class="w-16 px-2 py-1 border rounded text-center" style="width:60px;">
+        `;
+        return container;
+    }
+
+    // Thêm UI vào đầu trang
+    document.addEventListener('DOMContentLoaded', function () {
+        const controls = document.getElementById('controls-area') || document.body;
+        const precisionSetting = createPrecisionSetting();
+        controls.insertBefore(precisionSetting, controls.firstChild);
+        document.getElementById('precision-input').addEventListener('change', function(e) {
+            let val = parseInt(e.target.value);
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > 15) val = 15;
+            displayPrecision = val;
+            // Nếu đã có kết quả, render lại với precision mới
+            if (window.lastResult && window.lastDisplayFn) {
+                window.lastDisplayFn(window.lastResult);
+            }
+        });
+    });
+
+    // Đảm bảo bảng ma trận luôn scroll ngang nếu quá rộng
+    // XÓA style tạo viền bảng, chỉ giữ scroll ngang nếu muốn
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .matrix-container { overflow-x: auto; max-width: 100vw; }
+        .matrix-table { border-collapse: collapse; }
+        @media (max-width: 600px) {
+            .matrix-table td { min-width: 40px; font-size: 13px; }
+        }
+    `;
+    document.head.appendChild(style);
 });

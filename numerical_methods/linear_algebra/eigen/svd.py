@@ -1,5 +1,10 @@
 import numpy as np
 
+def zero_small(x, tol=1e-15):
+    x = np.array(x)
+    x[np.abs(x) < tol] = 0.0
+    return x
+
 def calculate_svd(A):
     """
     Thực hiện phân tích giá trị kỳ dị (SVD) đầy đủ cho một ma trận A.
@@ -36,8 +41,8 @@ def calculate_svd(A):
         
         # Tạo ma trận Sigma có kích thước (m, n)
         Sigma = np.zeros((m, n))
-        diag_len = min(m, n)
-        Sigma[:diag_len, :diag_len] = np.diag(singular_values)
+        diag_len = min(m, n, singular_values.shape[0])
+        Sigma[:diag_len, :diag_len] = np.diag(singular_values[:diag_len])
         
         # --- Bước 2: Tính ma trận U đầy đủ (full U) từ A @ A.T ---
         # AAt là ma trận (m, m)
@@ -53,14 +58,14 @@ def calculate_svd(A):
         # Trả về kết quả cuối cùng và các bước trung gian
         return {
             "success": True,
-            "U": U.tolist(),
-            "Sigma": Sigma.tolist(),
-            "V_transpose": V.T.tolist(),
+            "U": zero_small(U).tolist(),
+            "Sigma": zero_small(Sigma).tolist(),
+            "V_transpose": zero_small(V.T).tolist(),
             "intermediate_steps": {
-                "A_transpose_A": AtA.tolist(),
-                "eigenvalues_of_ATA": eigenvalues_V_sorted.tolist(),
-                "singular_values": singular_values.tolist(),
-                "V_matrix": V.tolist()
+                "A_transpose_A": zero_small(AtA).tolist(),
+                "eigenvalues_of_ATA": zero_small(eigenvalues_V_sorted).tolist(),
+                "singular_values": zero_small(singular_values).tolist(),
+                "V_matrix": zero_small(V).tolist()
             }
         }
     except Exception as e:

@@ -23,9 +23,11 @@ def hpt_solver(solver_function):
         matrix_a = np.array(data['matrix_a'], dtype=float)
         matrix_b = np.array(data['matrix_b'], dtype=float)
         result = solver_function(matrix_a, matrix_b)
+        # Đảm bảo luôn trả về JSON serializable
         return jsonify(result)
     except Exception as e:
         import traceback
+        print("Lỗi khi xử lý request:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {traceback.format_exc()}"}), 500
 
 @app.route('/matrix/svd', methods=['POST'])
@@ -38,6 +40,8 @@ def handle_svd_calculation():
         result = calculate_svd(matrix_a)
         return jsonify(result)
     except Exception as e:
+        import traceback
+        print("Lỗi khi xử lý SVD:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
 @app.route('/matrix/gauss-jordan', methods=['POST'])

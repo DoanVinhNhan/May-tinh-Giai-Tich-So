@@ -1,5 +1,10 @@
 import numpy as np
 
+def zero_small(x, tol=1e-15):
+    x = np.array(x)
+    x[np.abs(x) < tol] = 0.0
+    return x
+
 def solve_gauss_elimination(matrix_a, matrix_b):
     try:
         ZERO_TOLERANCE = 1e-15
