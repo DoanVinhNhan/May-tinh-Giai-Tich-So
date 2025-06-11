@@ -9,40 +9,107 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-100 font-['Be_Vietnam_Pro']">
-
-    <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-800">Máy tính Ma trận</h1>
-        </header>
-
-        <main class="bg-white p-6 rounded-2xl shadow-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                    <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
-                    <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
-                </div>
-                <div>
-                    <label for="matrix-b-input" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
-                    <textarea id="matrix-b-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7&#10;8"></textarea>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">SVD</button>
-                <button id="calculate-gauss-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Gauss</button>
-                <button id="calculate-gj-btn" class="action-btn bg-green-600 hover:bg-green-700">Gauss-Jordan</button>
-                <button id="calculate-lu-btn" class="action-btn bg-orange-500 hover:bg-orange-600">LU</button>
-                <button id="calculate-cholesky-btn" class="action-btn bg-red-500 hover:bg-red-600">Cholesky</button>
-            </div>
-            
-            <hr/>
-
-            <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
-            <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
-            <div id="results-area"></div>
-        </main>
-        <footer class="text-center mt-8 text-gray-500 text-sm"><p>&copy; 2024 - Xây dựng bởi Gemini</p></footer>
+<div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar-menu" class="bg-white shadow-lg w-64 min-w-[180px] max-w-xs transition-all duration-300 ease-in-out h-screen sticky top-0 z-20 flex flex-col" style="left:0;">
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+            <span class="font-bold text-lg text-blue-700">Menu</span>
+            <button id="sidebar-toggle" class="text-gray-500 hover:text-blue-600 focus:outline-none">
+                <svg id="sidebar-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+        </div>
+        <nav class="flex-1 px-2 py-4">
+            <ul class="space-y-2">
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-blue-50 font-medium text-gray-800" data-page="matrix">Máy tính ma trận</button>
+                    <ul class="ml-4 mt-1 space-y-1">
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve">Giải hệ phương trình</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Giải SVD</button></li>
+                    </ul>
+                </li>
+                <!-- Có thể thêm các nhóm trang khác ở đây -->
+            </ul>
+        </nav>
+    </aside>
+    <!-- Main Content -->
+    <div class="flex-1">
+        <div class="container mx-auto p-4 md:p-8">
+            <header class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-gray-800">Máy tính Ma trận</h1>
+            </header>
+            <main id="main-content" class="bg-white p-6 rounded-2xl shadow-lg">
+                <!-- Nội dung động sẽ được render ở đây -->
+            </main>
+            <footer class="text-center mt-8 text-gray-500 text-sm"><p>&copy; 2024 - Xây dựng bởi Gemini</p></footer>
+        </div>
     </div>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+// Sidebar toggle logic
+const sidebar = document.getElementById('sidebar-menu');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+let sidebarOpen = true;
+sidebarToggle.addEventListener('click', () => {
+    sidebarOpen = !sidebarOpen;
+    if (sidebarOpen) {
+        sidebar.style.left = '0';
+        sidebar.style.width = '16rem';
+    } else {
+        sidebar.style.left = '-13rem';
+        sidebar.style.width = '0';
+    }
+});
+</script>
+<!-- Trang ẩn: Giải hệ phương trình -->
+<div id="matrix-solve-page" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+            <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+            <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
+        </div>
+        <div>
+            <label for="matrix-b-input" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
+            <textarea id="matrix-b-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7&#10;8"></textarea>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button id="calculate-gauss-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Gauss</button>
+        <button id="calculate-gj-btn" class="action-btn bg-green-600 hover:bg-green-700">Gauss-Jordan</button>
+        <button id="calculate-lu-btn" class="action-btn bg-orange-500 hover:bg-orange-600">LU</button>
+        <button id="calculate-cholesky-btn" class="action-btn bg-red-500 hover:bg-red-600">Cholesky</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<!-- Trang ẩn: Giải SVD -->
+<div id="matrix-svd-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
+    </div>
+    <div class="mb-6">
+        <label for="svd-method-select" class="block text-sm font-medium text-gray-700">Phương pháp SVD</label>
+        <select id="svd-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2">
+            <option value="default">SVD chuẩn (NumPy)</option>
+            <option value="power">SVD Power Method + Deflation</option>
+        </select>
+    </div>
+    <div class="mb-6">
+        <label for="svd-num-singular" class="block text-sm font-medium text-gray-700">Số giá trị kỳ dị cần tìm (nếu dùng Power Method, mặc định: nhỏ nhất giữa số hàng/cột)</label>
+        <input id="svd-num-singular" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="(Tùy chọn)">
+    </div>
+    <div class="mb-6">
+        <label for="svd-init-matrix-input" class="block text-sm font-medium text-gray-700">Ma trận khởi đầu SVD (tùy chọn)</label>
+        <textarea id="svd-init-matrix-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-3 font-mono" placeholder="(Tùy chọn, chỉ dùng cho SVD)"></textarea>
+    </div>
+    <div class="mb-6">
+        <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">SVD</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
 </body>
 </html>
