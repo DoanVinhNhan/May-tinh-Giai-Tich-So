@@ -1,62 +1,57 @@
-# /numerical_methods/root_finding/simple_iteration.py
 import numpy as np
+from utils.expression_parser import get_derivative, parse_expression
 
-def solve_simple_iteration(parsed_phi, a, b, x0_str, mode, value):
-    """
-    Giải phương trình x = phi(x) bằng phương pháp Lặp đơn.
-    """
-    phi = parsed_phi['phi']
-    phi_prime = parsed_phi['phi_prime']
-    steps = []
-
+def solve_simple_iteration(phi_expr, a, b, x0, tol=1e-6, max_iter=100, mode='absolute_error'):
     try:
-        x0 = float(x0_str)
-    except (ValueError, TypeError):
-        return {"success": False, "error": "Điểm bắt đầu x0 không hợp lệ."}
-
-    if not (a <= x0 <= b):
-        return {"success": False, "error": "Điểm bắt đầu x0 phải nằm trong khoảng [a, b]."}
-
-    # 1. Tính q và kiểm tra điều kiện hội tụ
-    # Lấy mẫu trên khoảng để tìm max
-    test_points = np.linspace(a, b, 100)
-    q = np.max(np.abs(phi_prime(test_points)))
-
-    if q >= 1:
-        return {"success": False, "error": f"Điều kiện hội tụ không thỏa mãn. |φ'(x)| = {q:.4f} >= 1."}
+        phi = parse_expression(phi_expr)
         
-    x_curr = x0
-    x_prev = x_curr + 1 # Khởi tạo
+        # Kiểm tra điều kiện cách ly nghiệm
+        fa = phi(a) - a
+        fb = phi(b) - b
+        if fa * fb >= 0:
+            return {'success': False, 'error': f'Khoảng [{a}, {b}] không phải là khoảng cách ly nghiệm vì f(a)={fa:.4f} và f(b)={fb:.4f} không trái dấu.'}
 
-    for i in range(200):
-        step_info = {"n": i, "x_n": x_curr}
+        # Kiểm tra điều kiện hội tụ ban đầu
+        try:
+            Dphi_expr = get_derivative(phi_expr)
+            Dphi = parse_expression(Dphi_expr)
+            # Kiểm tra q = max|g'(x)| trên [a,b]
+            test_points = np.linspace(a, b, 100)
+            q = np.max(np.abs([Dphi(p) for p in test_points]))
+            if q >= 1:
+                return {"success": False, "error": f"Điều kiện hội tụ không thỏa mãn. |φ'(x)| = q ≈ {q:.4f} >= 1."}
+        except Exception:
+            # Bỏ qua nếu không tính được đạo hàm, sẽ kiểm tra trong vòng lặp
+            pass
+
+        steps = []
+        x_k = x0 # Gán x0 ban đầu
         
-        # 2. Kiểm tra điều kiện dừng
-        done = False
-        error_val = np.abs(x_curr - x_prev)
+        for k in range(max_iter):
+            x_k_plus_1 = phi(x_k)
+            
+            error = abs(x_k_plus_1 - x_k)
+            if mode == 'relative_error' and abs(x_k_plus_1) > 1e-12:
+                error = error / abs(x_k_plus_1)
+            
+            # Ghi lại bước lặp
+            steps.append({
+                'k': k,
+                'x_k': x_k,
+                'phi(x_k)': x_k_plus_1, # phi(x_k) chính là x_{k+1}
+                'error': error
+            })
+            
+            if error < tol:
+                return {"success": True, "solution": x_k_plus_1, "iterations": k + 1, "steps": steps}
+            
+            # Cập nhật cho vòng lặp tiếp theo
+            x_k = x_k_plus_1
+            
+            if not (a <= x_k <= b):
+                return {"success": False, "error": f"Điểm lặp x_{k+1} = {x_k} nằm ngoài khoảng [{a}, {b}]."}
 
-        if i > 0: # Chỉ kiểm tra từ lần lặp thứ 2
-            if mode == 'iterations' and i >= int(value):
-                done = True
-            elif mode == 'absolute_error':
-                stop_val = value
-                step_info[f'|x_n-x_{"n-1"}|'] = error_val
-                if (q / (1 - q)) * error_val <= stop_val: done = True
-            elif mode == 'relative_error':
-                stop_val = value
-                relative_error = (q / (1 - q)) * (error_val / np.abs(x_curr)) if x_curr !=0 else float('inf')
-                step_info[f'q|x_n-x_{"n-1"}|/((1-q)|x_n|)'] = relative_error
-                if relative_error <= stop_val: done = True
+        return {"success": False, "error": "Phương pháp không hội tụ sau số lần lặp tối đa."}
 
-        steps.append(step_info)
-        if done:
-            break
-
-        # 3. Cập nhật
-        x_prev = x_curr
-        x_curr = phi(x_prev)
-
-    else:
-        return {"success": False, "error": "Không hội tụ sau 200 lần lặp."}
-
-    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps), "q_value": q}
+    except Exception as e:
+        return {"success": False, "error": f"Lỗi trong quá trình thực thi: {str(e)}"}

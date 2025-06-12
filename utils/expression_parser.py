@@ -1,7 +1,19 @@
 # /utils/expression_parser.py
-from sympy import sympify, lambdify, symbols, SympifyError
+from sympy import sympify, lambdify, symbols, SympifyError, diff
 import numpy as np
-
+def get_derivative(expr_str):
+    """
+    Tính đạo hàm của một biểu thức dạng chuỗi và trả về chuỗi biểu diễn đạo hàm.
+    """
+    try:
+        x = symbols('x')
+        expr = sympify(expr_str)
+        derivative_expr = diff(expr, x)
+        return str(derivative_expr)
+    except (SympifyError, TypeError, SyntaxError):
+        # Nếu có lỗi, trả về chuỗi rỗng để nơi gọi xử lý
+        return ""
+    
 def parse_expression(expr_str):
     """
     Phân tích một chuỗi biểu thức thành các hàm số có thể gọi được.

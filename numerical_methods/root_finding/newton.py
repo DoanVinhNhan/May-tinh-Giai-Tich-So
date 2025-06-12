@@ -1,90 +1,117 @@
-# /numerical_methods/root_finding/newton.py
 import numpy as np
+from scipy.optimize import minimize_scalar
+from utils.expression_parser import get_derivative, parse_expression
 
-def solve_newton(parsed_expr, a, b, mode, value, stop_condition):
-    """
-    Giải phương trình f(x) = 0 bằng phương pháp Newton.
+def solve_newton(f_expr, a, b, tol=1e-6, max_iter=100, mode='absolute_error', stop_condition='f_xn'):
+    try:
+        # === BẮT ĐẦU SỬA LỖI ===
+        # Xử lý f(x)
+        parsed_f = parse_expression(f_expr)
+        if not parsed_f.get('success'):
+            return {"success": False, "error": f"Lỗi cú pháp trong hàm f(x): {parsed_f.get('error')}"}
+        f = parsed_f.get('f')  # Lấy đúng hàm từ dictionary
 
-    Args:
-        parsed_expr (dict): Dict chứa các hàm f, f_prime, f_double_prime.
-        a (float): Điểm đầu của khoảng cách ly.
-        b (float): Điểm cuối của khoảng cách ly.
-        mode (str): Điều kiện dừng ('absolute_error', 'relative_error', 'iterations').
-        value (float): Giá trị cho điều kiện dừng.
-        stop_condition (str): Công thức sai số ('f_xn' hoặc 'xn_xn-1').
-    
-    Returns:
-        dict: Kết quả chứa nghiệm, các bước lặp và trạng thái thành công.
-    """
-    f = parsed_expr['f']
-    f_prime = parsed_expr['f_prime']
-    f_double_prime = parsed_expr['f_double_prime']
-    steps = []
+        # Xử lý f'(x)
+        Df_expr = get_derivative(f_expr)
+        parsed_Df = parse_expression(Df_expr)
+        if not parsed_Df.get('success'):
+            return {"success": False, "error": f"Lỗi cú pháp trong hàm f'(x): {parsed_Df.get('error')}"}
+        Df = parsed_Df.get('f') # Lấy đúng hàm từ dictionary
 
-    # 1. Kiểm tra điều kiện hội tụ
-    if f_prime(a) * f_prime(b) <= 0 or f_double_prime(a) * f_double_prime(b) <= 0:
-        return {"success": False, "error": "Điều kiện hội tụ f'(x) và f''(x) không đổi dấu trên [a, b] không thỏa mãn."}
-    
-    # 2. Chọn điểm bắt đầu x0 (Fourier's condition)
-    if f(a) * f_double_prime(a) > 0:
-        x0 = a
-    elif f(b) * f_double_prime(b) > 0:
-        x0 = b
-    else:
-        return {"success": False, "error": "Không tìm thấy điểm bắt đầu x0 thỏa mãn điều kiện Fourier."}
+        # Xử lý f''(x)
+        D2f_expr = get_derivative(Df_expr)
+        parsed_D2f = parse_expression(D2f_expr)
+        if not parsed_D2f.get('success'):
+            return {"success": False, "error": f"Lỗi cú pháp trong hàm f''(x): {parsed_D2f.get('error')}"}
+        D2f = parsed_D2f.get('f') # Lấy đúng hàm từ dictionary
+        # === KẾT THÚC SỬA LỖI ===
 
-    # 3. Tính hằng số
-    m1 = min(np.abs(f_prime(a)), np.abs(f_prime(b)))
-    if m1 == 0:
-        return {"success": False, "error": "Đạo hàm f'(x) bằng 0 tại biên, không thể chia."}
+        # === START: TÍNH m1 VÀ M1 === (Phần này giữ nguyên)
+        res_m1 = minimize_scalar(lambda x: np.abs(Df(x)), bounds=(a, b), method='bounded')
+        m1 = res_m1.fun
+
+        res_M1 = minimize_scalar(lambda x: -np.abs(D2f(x)), bounds=(a, b), method='bounded')
+        M1 = -res_M1.fun
+        # === END: TÍNH m1 VÀ M1 ===
+
+        # Phần còn lại của hàm giữ nguyên vì f, Df, D2f giờ đã là các hàm tính toán đúng
+        if f(a) * D2f(a) > 0:
+            x0 = a
+        elif f(b) * D2f(b) > 0:
+            x0 = b
+        else:
+            x0 = (a + b) / 2
+
+        steps = []
+        x_k = x0
         
-    M2 = max(np.abs(f_double_prime(a)), np.abs(f_double_prime(b)))
-    
-    x_curr = x0
-    x_prev = x_curr + 1 # Khởi tạo để vòng lặp đầu tiên chạy
+        # Kiểm tra điều kiện hội tụ tại nhiều điểm trên [a, b]
+        N_check = 20
+        x_check = np.linspace(a, b, N_check)
+        h = 1e-6
+        fp_signs = []
+        fpp_signs = []
+        for x in x_check:
+            try:
+                fp = Df(x) if Df else (f(x + h) - f(x - h)) / (2 * h)
+                fpp = D2f(x) if D2f else (f(x + h) - 2*f(x) + f(x - h)) / (h**2)
+                fp_signs.append(np.sign(fp))
+                fpp_signs.append(np.sign(fpp))
+            except Exception:
+                fp_signs.append(0)
+                fpp_signs.append(0)
+        # Loại bỏ các điểm đạo hàm gần 0
+        fp_signs = [s for s in fp_signs if abs(s) > 1e-8]
+        fpp_signs = [s for s in fpp_signs if abs(s) > 1e-8]
+        monotonic_fp = all(s > 0 for s in fp_signs) or all(s < 0 for s in fp_signs)
+        monotonic_fpp = all(s > 0 for s in fpp_signs) or all(s < 0 for s in fpp_signs)
+        monotonic_warning = None
+        if not monotonic_fp or not monotonic_fpp:
+            monotonic_warning = f"Cảnh báo: f'(x) hoặc f''(x) có thể đổi dấu trên [{a}, {b}]. Phương pháp Newton chỉ đảm bảo hội tụ nếu f'(x), f''(x) liên tục và không đổi dấu."
 
-    for i in range(200): # Giới hạn 200 lần lặp
-        f_val = f(x_curr)
-        f_prime_val = f_prime(x_curr)
+        # Kiểm tra điều kiện hội tụ tại hai đầu mút
+        if Df(a) * Df(b) <= 0 or D2f(a) * D2f(b) <= 0:
+            return {"success": False, "error": "Điều kiện hội tụ f'(x) và f''(x) không đổi dấu trên [a, b] không thỏa mãn."}
 
-        if f_prime_val == 0:
-            return {"success": False, "error": f"Đạo hàm bằng 0 tại x = {x_curr}."}
-
-        # Ghi lại bước hiện tại
-        step_info = {"n": i, "x_n": x_curr, "f(x_n)": f_val}
-        
-        # Kiểm tra điều kiện dừng TRƯỚC khi cập nhật
-        done = False
-        if mode == 'iterations' and i >= int(value):
-            done = True
-        elif mode == 'absolute_error':
-            if stop_condition == 'f_xn':
-                error = np.abs(f_val) / m1
-                step_info['|f(x_n)|/m1'] = error
-                if error <= value: done = True
-            else: # 'xn_xn-1'
-                error = (M2 / (2 * m1)) * (x_curr - x_prev)**2
-                step_info['M2|x_n-x_{n-1}|²/(2m1)'] = error
-                if error <= value: done = True
-        elif mode == 'relative_error':
-            if stop_condition == 'f_xn':
-                 error = np.abs(f_val) / (m1 * np.abs(x_curr)) if x_curr != 0 else float('inf')
-                 step_info['|f(x_n)|/(m1|x_n|)'] = error
-                 if error <= value: done = True
-            else: # 'xn_xn-1'
-                error = (M2 / (2 * m1 * np.abs(x_curr))) * (x_curr - x_prev)**2 if x_curr != 0 else float('inf')
-                step_info['M2|x_n-x_{n-1}|²/(2m1|x_n|)'] = error
-                if error <= value: done = True
-
-        steps.append(step_info)
-        if done:
-            break
+        for k in range(max_iter):
+            f_xk = f(x_k)
+            df_xk = Df(x_k)
             
-        # Cập nhật cho lần lặp tiếp theo
-        x_prev = x_curr
-        x_curr = x_prev - f_val / f_prime_val
+            if abs(df_xk) < 1e-12:
+                return {"success": False, "error": f"Đạo hàm bằng 0 tại x = {x_k}. Không thể tiếp tục."}
 
-    else: # Nếu vòng lặp hoàn tất mà không `break`
-        return {"success": False, "error": "Phương pháp không hội tụ sau 200 lần lặp."}
+            x_k_plus_1 = x_k - f_xk / df_xk
+            
+            error = abs(x_k_plus_1 - x_k)
+            if mode == 'relative_error' and abs(x_k_plus_1) > 1e-12:
+                error = error / abs(x_k_plus_1)
 
-    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps)}
+            steps.append({
+                'k': k, 'x_k': x_k, 'f_xk': f_xk,
+                'df_xk': df_xk, 'x_k+1': x_k_plus_1, 'error': error
+            })
+            
+            stop_check_value = abs(f(x_k_plus_1)) if stop_condition == 'f_xn' else abs(x_k_plus_1 - x_k)
+
+            if stop_check_value < tol:
+                return {
+                    "success": True, 
+                    "solution": x_k_plus_1, 
+                    "iterations": k + 1, 
+                    "steps": steps,
+                    "m1": m1,
+                    "M1": M1,
+                    "warning": monotonic_warning
+                }
+            
+            x_k = x_k_plus_1
+            
+            if not (a <= x_k <= b):
+                return {"success": False, "error": f"Điểm lặp x_{k+1} = {x_k} nằm ngoài khoảng [{a}, {b}]."}
+
+        return {"success": False, "error": "Phương pháp không hội tụ sau số lần lặp tối đa."}
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": f"Lỗi trong quá trình thực thi: {str(e)}"}

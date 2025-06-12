@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import numpy as np
 import traceback
+
 # --- Import các phương thức của Máy tính ma trận ---
 from numerical_methods.linear_algebra.direct_methods.gauss_elimination import solve_gauss_elimination
 from numerical_methods.linear_algebra.direct_methods.gauss_jordan import solve_gauss_jordan
@@ -9,13 +10,24 @@ from numerical_methods.linear_algebra.direct_methods.lu_decomposition import sol
 from numerical_methods.linear_algebra.direct_methods.cholesky import solve_cholesky
 from numerical_methods.linear_algebra.eigen.svd import calculate_svd
 from numerical_methods.linear_algebra.eigen.danilevsky import danilevsky_algorithm
+
+# --- START: IMPORT MỚI CHO TÍNH NGHỊCH ĐẢO ---
+from numerical_methods.linear_algebra.inverse.gauss_jordan_inverse import solve_inverse_gauss_jordan
+from numerical_methods.linear_algebra.inverse.lu_inverse import solve_inverse_lu
+from numerical_methods.linear_algebra.inverse.cholesky_inverse import solve_inverse_cholesky
+from numerical_methods.linear_algebra.inverse.bordering import solve_inverse_bordering
+from numerical_methods.linear_algebra.inverse.jacobi_inverse import solve_inverse_jacobi
+from numerical_methods.linear_algebra.inverse.newton_inverse import solve_inverse_newton
+# --- END: IMPORT MỚI ---
+
 # --- Import các phương thức của Giải phương trình f(x)=0 ---
 from utils.expression_parser import parse_expression, parse_phi_expression
 from numerical_methods.root_finding.bisection import solve_bisection
 from numerical_methods.root_finding.secant import solve_secant
 from numerical_methods.root_finding.newton import solve_newton
 from numerical_methods.root_finding.simple_iteration import solve_simple_iteration
-#from numerical_methods.root_finding.polynomial import solve_polynomial
+from utils.expression_parser import get_derivative
+
 app = Flask(__name__)
 CORS(app)
 
@@ -31,13 +43,36 @@ def hpt_solver(solver_function):
         matrix_a = np.array(data['matrix_a'], dtype=float)
         matrix_b = np.array(data['matrix_b'], dtype=float)
         result = solver_function(matrix_a, matrix_b)
-        # Đảm bảo luôn trả về JSON serializable
         result['success'] = True if 'error' not in result else False
         return jsonify(result)
     except Exception as e:
-        import traceback
-        print("Lỗi khi xử lý request:", traceback.format_exc())
+        print("Lỗi khi xử lý request HPT:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+
+# --- START: HELPER MỚI CHO TÍNH NGHỊCH ĐẢO ---
+def inverse_solver(solver_function):
+    data = request.get_json()
+    if not data or 'matrix_a' not in data:
+        return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu ma trận A."}), 400
+    try:
+        matrix_a = np.array(data['matrix_a'], dtype=float)
+        
+        # Lấy các tham số bổ sung (cho phương pháp lặp)
+        params = {}
+        if 'tolerance' in data:
+            params['eps'] = float(data['tolerance'])
+        if 'max_iter' in data:
+            params['max_iter'] = int(data['max_iter'])
+        if 'x0_method' in data:
+            params['x0_method'] = data['x0_method']
+            
+        result = solver_function(matrix_a, **params)
+        result['success'] = True if 'error' not in result else False
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý request nghịch đảo:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+# --- END: HELPER MỚI ---
 
 @app.route('/matrix/svd', methods=['POST'])
 def handle_svd_calculation():
@@ -49,18 +84,15 @@ def handle_svd_calculation():
         init_matrix = None
         if 'init_matrix' in data and data['init_matrix']:
             init_matrix = np.array(data['init_matrix'], dtype=float)
-        # Lấy method và các tham số power method nếu có
         method = data.get('method', 'default')
         num_singular = data.get('num_singular', None)
         num_iter = data.get('num_iter', 20)
         tol = data.get('tol', 1e-8)
-        # Chuyển num_singular sang int nếu có
         if num_singular is not None:
             try:
                 num_singular = int(num_singular)
             except Exception:
                 num_singular = None
-        # Gọi calculate_svd với method phù hợp
         if method == 'power':
             result = calculate_svd(matrix_a, method='power', num_singular=num_singular, num_iter=num_iter, tol=tol)
         else:
@@ -68,7 +100,6 @@ def handle_svd_calculation():
         result['success'] = True if 'error' not in result else False
         return jsonify(result)
     except Exception as e:
-        import traceback
         print("Lỗi khi xử lý SVD:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
@@ -93,56 +124,108 @@ def handle_danilevsky():
     data = request.get_json()
     matrix_a = np.array(data.get('matrix_a'))
     try:
-        result = danilevsky_algorithm(matrix_a)
-        return jsonify({'success': True, **result})
+        eigen_results = danilevsky_algorithm(matrix_a)
+        # Sửa lỗi: Đảm bảo kết quả luôn là một dictionary và có success flag
+        if isinstance(eigen_results, dict):
+            eigen_results['success'] = True
+            return jsonify(eigen_results)
+        else: # Trường hợp hàm cũ trả về list hoặc tuple
+            return jsonify({'success': True, 'data': eigen_results})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+# --- START: CÁC ENDPOINT MỚI CHO TÍNH NGHỊCH ĐẢO ---
+@app.route('/matrix/inverse/gauss-jordan', methods=['POST'])
+def handle_inverse_gauss_jordan():
+    return inverse_solver(solve_inverse_gauss_jordan)
+
+@app.route('/matrix/inverse/lu', methods=['POST'])
+def handle_inverse_lu():
+    return inverse_solver(solve_inverse_lu)
+
+@app.route('/matrix/inverse/cholesky', methods=['POST'])
+def handle_inverse_cholesky():
+    return inverse_solver(solve_inverse_cholesky)
+
+@app.route('/matrix/inverse/bordering', methods=['POST'])
+def handle_inverse_bordering():
+    return inverse_solver(solve_inverse_bordering)
+
+@app.route('/matrix/inverse/jacobi', methods=['POST'])
+def handle_inverse_jacobi():
+    return inverse_solver(solve_inverse_jacobi)
+
+@app.route('/matrix/inverse/newton', methods=['POST'])
+def handle_inverse_newton():
+    return inverse_solver(solve_inverse_newton)
+# --- END: CÁC ENDPOINT MỚI ---
+
 @app.route('/nonlinear-equation/solve', methods=['POST'])
-def handle_nonlinear_equation():
+def solve_nonlinear_equation():
+    data = request.get_json()
+    method = data.get('method')
+    expression_str = data.get('expression')
+    
     try:
-        data = request.get_json()
-        method = data.get('method')
-        
+        a = float(data['interval_a'])
+        b = float(data['interval_b'])
+        stop_value = data.get('value')
+        mode = data.get('mode', 'absolute_error')
+        stop_condition = data.get('stop_condition')
+
         if method == 'simple_iteration':
-            # Lặp đơn có cách xử lý input khác
-            parsed_phi = parse_phi_expression(data['expression'])
-            if not parsed_phi['success']: return jsonify(parsed_phi), 400
-            
-            result = solve_simple_iteration(
-                parsed_phi, 
-                float(data['interval_a']), 
-                float(data['interval_b']), 
-                data['interval_a'], 
-                data['mode'], 
-                float(data['value'])
-            )
+            parsed_result = parse_phi_expression(expression_str)
         else:
-            # Các phương pháp khác
-            parsed = parse_expression(data['expression'])
-            if not parsed['success']: return jsonify(parsed), 400
+            parsed_result = parse_expression(expression_str)
 
-            a = float(data['interval_a'])
-            b = float(data['interval_b'])
-            mode = data['mode']
-            value = float(data['value'])
-            stop_condition = data.get('stop_condition')
+        if not parsed_result.get('success'):
+            return jsonify({'success': False, 'error': parsed_result.get('error', 'Lỗi phân tích biểu thức.')})
 
-            solvers = {
-                'bisection': lambda: solve_bisection(parsed['f'], a, b, mode, value),
-                'newton': lambda: solve_newton(parsed, a, b, mode, value, stop_condition),
-                'secant': lambda: solve_secant(parsed, a, b, mode, value, stop_condition),
-            }
-            if method in solvers:
-                result = solvers[method]()
+        f = parsed_result.get('f')
+        if method == 'simple_iteration':
+            phi = parsed_result.get('phi')
+
+        if method in ['bisection', 'newton', 'secant']:
+            try:
+                fa = f(a)
+                fb = f(b)
+                if fa * fb >= 0 and method == 'bisection':
+                    return jsonify({'success': False, 'error': f'Khoảng [{a}, {b}] không phải là khoảng cách ly nghiệm vì f(a)={fa:.4f} và f(b)={fb:.4f} không trái dấu.'})
+            except (ValueError, TypeError) as e:
+                 return jsonify({'success': False, 'error': f'Không thể tính giá trị hàm tại điểm a={a} hoặc b={b}. Lỗi: {e}'})
+        
+        try:
+            if mode == 'iterations':
+                N = int(float(stop_value))
+                tol = 1e-6 
             else:
-                return jsonify({"success": False, "error": f"Phương pháp '{method}' không được hỗ trợ."}), 400
+                tol = float(stop_value)
+                N = 200
+        except (ValueError, TypeError):
+             return jsonify({'success': False, 'error': 'Giá trị điều kiện dừng phải là một con số.'})
+
+        if method == 'bisection':
+            result = solve_bisection(f, a, b, mode, stop_value)
+        elif method == 'newton':
+            result = solve_newton(expression_str, a, b, tol, N, mode, stop_condition)
+        elif method == 'secant':
+            result = solve_secant(parsed_result, a, b, mode, tol, stop_condition)
+        elif method == 'simple_iteration':
+            x0_str = data.get('x0')
+            if x0_str is None or x0_str == '':
+                return jsonify({'success': False, 'error': 'Vui lòng nhập điểm bắt đầu x₀.'})
+            x0 = float(x0_str)
+            result = solve_simple_iteration(expression_str, a, b, x0, tol, N, mode)
+        else:
+            return jsonify({'success': False, 'error': 'Phương pháp không hợp lệ.'})
         
         return jsonify(result)
 
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False, 'error': f'Dữ liệu đầu vào không hợp lệ: {e}. Vui lòng kiểm tra lại các con số.'})
     except Exception as e:
-        print(traceback.format_exc())
-        return jsonify({"success": False, "error": f"Lỗi server: {str(e)}"}), 500
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Đã xảy ra lỗi không xác định: {e}'})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

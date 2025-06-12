@@ -10,7 +10,31 @@ def solve_secant(parsed_expr, a, b, mode, value, stop_condition):
     f_double_prime = parsed_expr['f_double_prime']
     steps = []
 
-    # 1. Kiểm tra điều kiện hội tụ
+    # Kiểm tra điều kiện hội tụ tại nhiều điểm trên [a, b]
+    N_check = 20
+    x_check = np.linspace(a, b, N_check)
+    h = 1e-6
+    fp_signs = []
+    fpp_signs = []
+    for x in x_check:
+        try:
+            fp = f_prime(x) if f_prime else (f(x + h) - f(x - h)) / (2 * h)
+            fpp = f_double_prime(x) if f_double_prime else (f(x + h) - 2*f(x) + f(x - h)) / (h**2)
+            fp_signs.append(np.sign(fp))
+            fpp_signs.append(np.sign(fpp))
+        except Exception:
+            fp_signs.append(0)
+            fpp_signs.append(0)
+    # Loại bỏ các điểm đạo hàm gần 0
+    fp_signs = [s for s in fp_signs if abs(s) > 1e-8]
+    fpp_signs = [s for s in fpp_signs if abs(s) > 1e-8]
+    monotonic_fp = all(s > 0 for s in fp_signs) or all(s < 0 for s in fp_signs)
+    monotonic_fpp = all(s > 0 for s in fpp_signs) or all(s < 0 for s in fpp_signs)
+    monotonic_warning = None
+    if not monotonic_fp or not monotonic_fpp:
+        monotonic_warning = f"Cảnh báo: f'(x) hoặc f''(x) có thể đổi dấu trên [{a}, {b}]. Phương pháp dây cung chỉ đảm bảo hội tụ nếu f'(x), f''(x) liên tục và không đổi dấu."
+
+    # 1. Kiểm tra điều kiện hội tụ tại hai đầu mút
     if f(a) * f(b) >= 0:
         return {"success": False, "error": "Điều kiện f(a) * f(b) < 0 không thỏa mãn."}
     if f_prime(a) * f_prime(b) <= 0 or f_double_prime(a) * f_double_prime(b) <= 0:
@@ -69,4 +93,4 @@ def solve_secant(parsed_expr, a, b, mode, value, stop_condition):
     else:
         return {"success": False, "error": "Không hội tụ sau 200 lần lặp."}
 
-    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps)}
+    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps), "warning": monotonic_warning}
