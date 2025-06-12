@@ -1,13 +1,21 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import numpy as np
+import traceback
+# --- Import các phương thức của Máy tính ma trận ---
 from numerical_methods.linear_algebra.direct_methods.gauss_elimination import solve_gauss_elimination
 from numerical_methods.linear_algebra.direct_methods.gauss_jordan import solve_gauss_jordan
 from numerical_methods.linear_algebra.direct_methods.lu_decomposition import solve_lu
 from numerical_methods.linear_algebra.direct_methods.cholesky import solve_cholesky
 from numerical_methods.linear_algebra.eigen.svd import calculate_svd
 from numerical_methods.linear_algebra.eigen.danilevsky import danilevsky_algorithm
-
+# --- Import các phương thức của Giải phương trình f(x)=0 ---
+from utils.expression_parser import parse_expression, parse_phi_expression
+from numerical_methods.root_finding.bisection import solve_bisection
+from numerical_methods.root_finding.secant import solve_secant
+from numerical_methods.root_finding.newton import solve_newton
+from numerical_methods.root_finding.simple_iteration import solve_simple_iteration
+#from numerical_methods.root_finding.polynomial import solve_polynomial
 app = Flask(__name__)
 CORS(app)
 
@@ -89,6 +97,52 @@ def handle_danilevsky():
         return jsonify({'success': True, **result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/nonlinear-equation/solve', methods=['POST'])
+def handle_nonlinear_equation():
+    try:
+        data = request.get_json()
+        method = data.get('method')
+        
+        if method == 'simple_iteration':
+            # Lặp đơn có cách xử lý input khác
+            parsed_phi = parse_phi_expression(data['expression'])
+            if not parsed_phi['success']: return jsonify(parsed_phi), 400
+            
+            result = solve_simple_iteration(
+                parsed_phi, 
+                float(data['interval_a']), 
+                float(data['interval_b']), 
+                data['interval_a'], 
+                data['mode'], 
+                float(data['value'])
+            )
+        else:
+            # Các phương pháp khác
+            parsed = parse_expression(data['expression'])
+            if not parsed['success']: return jsonify(parsed), 400
+
+            a = float(data['interval_a'])
+            b = float(data['interval_b'])
+            mode = data['mode']
+            value = float(data['value'])
+            stop_condition = data.get('stop_condition')
+
+            solvers = {
+                'bisection': lambda: solve_bisection(parsed['f'], a, b, mode, value),
+                'newton': lambda: solve_newton(parsed, a, b, mode, value, stop_condition),
+                'secant': lambda: solve_secant(parsed, a, b, mode, value, stop_condition),
+            }
+            if method in solvers:
+                result = solvers[method]()
+            else:
+                return jsonify({"success": False, "error": f"Phương pháp '{method}' không được hỗ trợ."}), 400
+        
+        return jsonify(result)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi server: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

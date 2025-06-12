@@ -20,7 +20,6 @@ def findSimpleA(A, k):
 def danilevsky_algorithm(A):
     """
     Thuật toán Danilevsky: trả về giá trị riêng, vector riêng, Frobenius, đa thức đặc trưng và các bước trung gian.
-    Số đếm hàng/cột bắt đầu từ 1 (theo toán học).
     """
     n = A.shape[0]
     back = np.eye(n)
