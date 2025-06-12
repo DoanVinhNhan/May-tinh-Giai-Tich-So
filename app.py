@@ -6,6 +6,7 @@ from numerical_methods.linear_algebra.direct_methods.gauss_jordan import solve_g
 from numerical_methods.linear_algebra.direct_methods.lu_decomposition import solve_lu
 from numerical_methods.linear_algebra.direct_methods.cholesky import solve_cholesky
 from numerical_methods.linear_algebra.eigen.svd import calculate_svd
+from numerical_methods.linear_algebra.eigen.danilevsky import danilevsky_algorithm
 
 app = Flask(__name__)
 CORS(app)
@@ -78,6 +79,16 @@ def handle_lu_decomposition_calculation():
 @app.route('/matrix/cholesky', methods=['POST'])
 def handle_cholesky_calculation():
     return hpt_solver(solve_cholesky)
+
+@app.route('/matrix/danilevsky', methods=['POST'])
+def handle_danilevsky():
+    data = request.get_json()
+    matrix_a = np.array(data.get('matrix_a'))
+    try:
+        result = danilevsky_algorithm(matrix_a)
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

@@ -25,6 +25,7 @@
                     <ul class="ml-4 mt-1 space-y-1">
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve">Giải hệ phương trình</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Giải SVD</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-danilevsky">Tìm Giá trị riêng</button></li>
                     </ul>
                 </li>
                 <!-- Có thể thêm các nhóm trang khác ở đây -->
@@ -65,12 +66,12 @@ sidebarToggle.addEventListener('click', () => {
 <div id="matrix-solve-page" class="hidden">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
-            <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
-            <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
+            <label for="matrix-a-input-hpt" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+            <textarea id="matrix-a-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
         </div>
         <div>
-            <label for="matrix-b-input" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
-            <textarea id="matrix-b-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7&#10;8"></textarea>
+            <label for="matrix-b-input-hpt" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
+            <textarea id="matrix-b-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7 1&#10;8 9&#10;3 -4"></textarea>
         </div>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -86,8 +87,8 @@ sidebarToggle.addEventListener('click', () => {
 <!-- Trang ẩn: Giải SVD -->
 <div id="matrix-svd-page" class="hidden">
     <div class="mb-6">
-        <label for="matrix-a-input" class="block text-sm font-medium text-gray-700">Ma trận A</label>
-        <textarea id="matrix-a-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6"></textarea>
+        <label for="matrix-a-input-svd" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-svd" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
     </div>
     <div class="mb-6">
         <label for="svd-method-select" class="block text-sm font-medium text-gray-700">Phương pháp SVD</label>
@@ -96,16 +97,31 @@ sidebarToggle.addEventListener('click', () => {
             <option value="power">SVD Power Method + Deflation</option>
         </select>
     </div>
-    <div class="mb-6">
-        <label for="svd-num-singular" class="block text-sm font-medium text-gray-700">Số giá trị kỳ dị cần tìm (nếu dùng Power Method, mặc định: nhỏ nhất giữa số hàng/cột)</label>
-        <input id="svd-num-singular" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="(Tùy chọn)">
+    <div id="svd-power-options" style="display:none;">
+        <div class="mb-6">
+            <label for="svd-num-singular" class="block text-sm font-medium text-gray-700">Số giá trị kỳ dị cần tìm (mặc định: nhỏ nhất giữa số hàng/cột)</label>
+            <input id="svd-num-singular" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="(Tùy chọn)">
+        </div>
+        <div class="mb-6">
+            <label for="svd-init-matrix-input" class="block text-sm font-medium text-gray-700">Vector khởi đầu SVD (tùy chọn, nhập dạng 1 1 1 hoặc mỗi dòng 1 số)</label>
+            <textarea id="svd-init-matrix-input" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-3 font-mono" placeholder="1 1 1 hoặc 1\n1\n1"></textarea>
+        </div>
     </div>
     <div class="mb-6">
-        <label for="svd-init-matrix-input" class="block text-sm font-medium text-gray-700">Ma trận khởi đầu SVD (tùy chọn)</label>
-        <textarea id="svd-init-matrix-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-3 font-mono" placeholder="(Tùy chọn, chỉ dùng cho SVD)"></textarea>
+        <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">Tính SVD</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<!-- Trang ẩn: Giải giá trị riêng (Danielevsky) -->
+<div id="matrix-danilevsky-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-danilevsky" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-danilevsky" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
     </div>
     <div class="mb-6">
-        <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">SVD</button>
+        <button id="calculate-danilevsky-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Danielevsky</button>
     </div>
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
     <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>

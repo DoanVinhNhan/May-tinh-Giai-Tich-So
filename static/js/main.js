@@ -112,7 +112,8 @@ async function handleCalculation(endpoint, body) {
             'gauss-jordan': wrapDisplay(displayGaussJordanResults),
             'gauss-elimination': wrapDisplay(displayGaussEliminationResults),
             'lu-decomposition': wrapDisplay(displayLuResults),
-            'cholesky': wrapDisplay(displayCholeskyResults)
+            'cholesky': wrapDisplay(displayCholeskyResults),
+            'danilevsky': wrapDisplay(displayDanilevskyResults)
         };
         const key = endpoint.split('/').pop();
         if (displayMap[key]) {
@@ -151,6 +152,10 @@ function renderPage(page) {
         mainContent.innerHTML = document.getElementById('matrix-svd-page').innerHTML;
         setupMatrixSvdEvents();
         document.title = 'Phân tích SVD | Máy tính ma trận';
+    } else if (page === 'matrix-danilevsky') {
+        mainContent.innerHTML = document.getElementById('matrix-danilevsky-page').innerHTML;
+        setupMatrixDanilevskyEvents();
+        document.title = 'Tìm giá trị riêng | Máy tính ma trận';
     } else {
         mainContent.innerHTML = '<div class="text-center text-gray-500">Chọn một chức năng ở menu bên trái.</div>';
         document.title = 'Máy tính ma trận';
@@ -174,256 +179,116 @@ document.querySelectorAll('[data-page]').forEach(btn => {
     });
 });
 // Hàm setup lại event cho trang giải hệ phương trình
-function setupMatrixSolveEvents() {
-    // Lấy lại các DOM element mới sau khi render
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const matrixB_Input = document.getElementById('matrix-b-input');
-    const resultsArea = document.getElementById('results-area');
-    const loadingSpinner = document.getElementById('loading-spinner');
+function setupHptCalculation(endpoint) {
+    const matrixA_Input = document.getElementById('matrix-a-input-hpt');
+    const matrixB_Input = document.getElementById('matrix-b-input-hpt');
     const errorMessage = document.getElementById('error-message');
-    // Gán event cho các nút giải hệ
-    document.getElementById('calculate-gj-btn').onclick = () => setupHptCalculation('/matrix/gauss-jordan', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-gauss-btn').onclick = () => setupHptCalculation('/matrix/gauss-elimination', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-lu-btn').onclick = () => setupHptCalculation('/matrix/lu-decomposition', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-cholesky-btn').onclick = () => setupHptCalculation('/matrix/cholesky', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
+    const resultsArea = document.getElementById('results-area');
+    const matrixA = parseMatrix(matrixA_Input.value);
+    const matrixB = parseMatrix(matrixB_Input.value);
+    if (matrixA.error || matrixA.length === 0) {
+        errorMessage.classList.remove('hidden');
+        errorMessage.textContent = matrixA.error || 'Lỗi: Ma trận A không được để trống.';
+        if (resultsArea) resultsArea.innerHTML = '';
+        return;
+    }
+    if (matrixB.error || matrixB.length === 0) {
+        errorMessage.classList.remove('hidden');
+        errorMessage.textContent = matrixB.error || 'Lỗi: Ma trận B không được để trống.';
+        if (resultsArea) resultsArea.innerHTML = '';
+        return;
+    }
+    const body = {
+        matrix_a: matrixA,
+        matrix_b: matrixB
+    };
+    handleCalculation(endpoint, body);
+}
+
+function setupMatrixSolveEvents() {
+    document.getElementById('calculate-gj-btn').onclick = () => setupHptCalculation('/matrix/gauss-jordan');
+    document.getElementById('calculate-gauss-btn').onclick = () => setupHptCalculation('/matrix/gauss-elimination');
+    document.getElementById('calculate-lu-btn').onclick = () => setupHptCalculation('/matrix/lu-decomposition');
+    document.getElementById('calculate-cholesky-btn').onclick = () => setupHptCalculation('/matrix/cholesky');
 }
 // Hàm setup lại event cho trang SVD
 function setupMatrixSvdEvents() {
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const initMatrixInput = document.getElementById('svd-init-matrix-input');
+    const matrixA_Input = document.getElementById('matrix-a-input-svd');
+    const methodSelect = document.getElementById('svd-method-select');
+    const numSingularInput = document.getElementById('svd-num-singular');
+    const yInitInput = document.getElementById('svd-init-matrix-input');
+    const powerOptionsDiv = document.getElementById('svd-power-options');
     const resultsArea = document.getElementById('results-area');
     const loadingSpinner = document.getElementById('loading-spinner');
     const errorMessage = document.getElementById('error-message');
+
+    // Ẩn/hiện các trường Power Method
+    function updateSvdOptions() {
+        if (methodSelect.value === 'power') {
+            powerOptionsDiv.style.display = '';
+        } else {
+            powerOptionsDiv.style.display = 'none';
+        }
+    }
+    if (methodSelect) {
+        methodSelect.onchange = updateSvdOptions;
+        updateSvdOptions();
+    }
+
     document.getElementById('calculate-svd-btn').onclick = () => {
         const matrixA = parseMatrix(matrixA_Input.value);
-        if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-        let initMatrix = undefined;
-        if (initMatrixInput && initMatrixInput.value.trim() !== '') {
-            initMatrix = parseMatrix(initMatrixInput.value);
-            if (initMatrix.error) { errorMessage.classList.remove('hidden'); errorMessage.textContent = initMatrix.error; resultsArea.innerHTML = ''; return; }
+        if (matrixA.error || matrixA.length === 0) {
+            errorMessage.classList.remove('hidden');
+            errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.';
+            resultsArea.innerHTML = '';
+            return;
         }
-        const body = { matrix_a: matrixA };
-        if (initMatrix) body.init_matrix = initMatrix;
+        const method = methodSelect ? methodSelect.value : 'default';
+        const body = { matrix_a: matrixA, method };
+        if (method === 'power') {
+            if (numSingularInput && numSingularInput.value) {
+                body.num_singular = parseInt(numSingularInput.value);
+            }
+            if (yInitInput && yInitInput.value.trim()) {
+                let yInitArr = [];
+                const lines = yInitInput.value.trim().split('\n');
+                if (lines.length === 1) {
+                    yInitArr = lines[0].trim().split(/\s+/).map(Number);
+                } else {
+                    yInitArr = lines.map(x => parseFloat(x.trim()));
+                }
+                if (yInitArr.some(isNaN)) {
+                    errorMessage.classList.remove('hidden');
+                    errorMessage.textContent = 'Vector khởi đầu không hợp lệ.';
+                    resultsArea.innerHTML = '';
+                    return;
+                }
+                body.y_init = yInitArr;
+            }
+        }
         handleCalculation('/matrix/svd', body);
     };
 }
-
-// Sửa lại setupHptCalculation để nhận đúng input/result area
-function setupHptCalculation(endpoint, matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage) {
-    const matrixA = parseMatrix(matrixA_Input.value);
-    if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-    const matrixB = parseMatrix(matrixB_Input.value);
-    if (matrixB.error || matrixB.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixB.error || 'Ma trận B không được để trống.'; resultsArea.innerHTML = ''; return; }
-    if (matrixA.length !== matrixB.length) { errorMessage.classList.remove('hidden'); errorMessage.textContent = `Số hàng của ma trận A (${matrixA.length}) và B (${matrixB.length}) phải bằng nhau.`; resultsArea.innerHTML = ''; return; }
-    handleCalculation(endpoint, { matrix_a: matrixA, matrix_b: matrixB });
-}
-
-// --- PAGE RENDERING LOGIC FOR SIDEBAR MENU ---
-function renderPage(page) {
-    const mainContent = document.getElementById('main-content');
-    if (!mainContent) return;
-    // Xóa các event listener cũ bằng cách thay thế vùng main-content
-    if (page === 'matrix-solve') {
-        mainContent.innerHTML = document.getElementById('matrix-solve-page').innerHTML;
-        setupMatrixSolveEvents();
-        document.title = 'Giải hệ phương trình | Máy tính ma trận';
-    } else if (page === 'matrix-svd') {
-        mainContent.innerHTML = document.getElementById('matrix-svd-page').innerHTML;
-        setupMatrixSvdEvents();
-        document.title = 'Phân tích SVD | Máy tính ma trận';
-    } else {
-        mainContent.innerHTML = '<div class="text-center text-gray-500">Chọn một chức năng ở menu bên trái.</div>';
-        document.title = 'Máy tính ma trận';
-    }
-    // Đảm bảo vùng hiển thị kết quả, spinner, error luôn đúng scope trang
-    window.resultsArea = document.getElementById('results-area');
-    window.loadingSpinner = document.getElementById('loading-spinner');
-    window.errorMessage = document.getElementById('error-message');
-    // Xóa kết quả cũ khi chuyển tab
-    if (window.resultsArea) window.resultsArea.innerHTML = '';
-    if (window.errorMessage) window.errorMessage.classList.add('hidden');
-    if (window.loadingSpinner) window.loadingSpinner.classList.add('hidden');
-    // Xóa cache kết quả toàn cục khi chuyển tab
-    window.lastResult = null;
-    window.lastDisplayFn = null;
-}
-// Gắn sự kiện cho sidebar menu
-document.querySelectorAll('[data-page]').forEach(btn => {
-    btn.addEventListener('click', e => {
-        renderPage(btn.getAttribute('data-page'));
-    });
-});
-// Hàm setup lại event cho trang giải hệ phương trình
-function setupMatrixSolveEvents() {
-    // Lấy lại các DOM element mới sau khi render
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const matrixB_Input = document.getElementById('matrix-b-input');
+// Hàm setup lại event cho trang Danilevsky
+function setupMatrixDanilevskyEvents() {
+    const matrixA_Input = document.getElementById('matrix-a-input-danilevsky');
     const resultsArea = document.getElementById('results-area');
     const loadingSpinner = document.getElementById('loading-spinner');
     const errorMessage = document.getElementById('error-message');
-    // Gán event cho các nút giải hệ
-    document.getElementById('calculate-gj-btn').onclick = () => setupHptCalculation('/matrix/gauss-jordan', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-gauss-btn').onclick = () => setupHptCalculation('/matrix/gauss-elimination', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-lu-btn').onclick = () => setupHptCalculation('/matrix/lu-decomposition', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-cholesky-btn').onclick = () => setupHptCalculation('/matrix/cholesky', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-}
-// Hàm setup lại event cho trang SVD
-function setupMatrixSvdEvents() {
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const initMatrixInput = document.getElementById('svd-init-matrix-input');
-    const resultsArea = document.getElementById('results-area');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const errorMessage = document.getElementById('error-message');
-    document.getElementById('calculate-svd-btn').onclick = () => {
+    document.getElementById('calculate-danilevsky-btn').onclick = () => {
         const matrixA = parseMatrix(matrixA_Input.value);
-        if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-        let initMatrix = undefined;
-        if (initMatrixInput && initMatrixInput.value.trim() !== '') {
-            initMatrix = parseMatrix(initMatrixInput.value);
-            if (initMatrix.error) { errorMessage.classList.remove('hidden'); errorMessage.textContent = initMatrix.error; resultsArea.innerHTML = ''; return; }
+        if (matrixA.error || matrixA.length === 0) {
+            errorMessage.classList.remove('hidden');
+            errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.';
+            resultsArea.innerHTML = '';
+            return;
         }
-        const body = { matrix_a: matrixA };
-        if (initMatrix) body.init_matrix = initMatrix;
-        handleCalculation('/matrix/svd', body);
+        handleCalculation('/matrix/danilevsky', { matrix_a: matrixA });
     };
-}
-
-// Sửa lại setupHptCalculation để nhận đúng input/result area
-function setupHptCalculation(endpoint, matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage) {
-    const matrixA = parseMatrix(matrixA_Input.value);
-    if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-    const matrixB = parseMatrix(matrixB_Input.value);
-    if (matrixB.error || matrixB.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixB.error || 'Ma trận B không được để trống.'; resultsArea.innerHTML = ''; return; }
-    if (matrixA.length !== matrixB.length) { errorMessage.classList.remove('hidden'); errorMessage.textContent = `Số hàng của ma trận A (${matrixA.length}) và B (${matrixB.length}) phải bằng nhau.`; resultsArea.innerHTML = ''; return; }
-    handleCalculation(endpoint, { matrix_a: matrixA, matrix_b: matrixB });
-}
-
-// --- PAGE RENDERING LOGIC FOR SIDEBAR MENU ---
-function renderPage(page) {
-    const mainContent = document.getElementById('main-content');
-    if (!mainContent) return;
-    // Xóa các event listener cũ bằng cách thay thế vùng main-content
-    if (page === 'matrix-solve') {
-        mainContent.innerHTML = document.getElementById('matrix-solve-page').innerHTML;
-        setupMatrixSolveEvents();
-        document.title = 'Giải hệ phương trình | Máy tính ma trận';
-    } else if (page === 'matrix-svd') {
-        mainContent.innerHTML = document.getElementById('matrix-svd-page').innerHTML;
-        setupMatrixSvdEvents();
-        document.title = 'Phân tích SVD | Máy tính ma trận';
-    } else {
-        mainContent.innerHTML = '<div class="text-center text-gray-500">Chọn một chức năng ở menu bên trái.</div>';
-        document.title = 'Máy tính ma trận';
-    }
-    // Đảm bảo vùng hiển thị kết quả, spinner, error luôn đúng scope trang
-    window.resultsArea = document.getElementById('results-area');
-    window.loadingSpinner = document.getElementById('loading-spinner');
-    window.errorMessage = document.getElementById('error-message');
-    // Xóa kết quả cũ khi chuyển tab
-    if (window.resultsArea) window.resultsArea.innerHTML = '';
-    if (window.errorMessage) window.errorMessage.classList.add('hidden');
-    if (window.loadingSpinner) window.loadingSpinner.classList.add('hidden');
-    // Xóa cache kết quả toàn cục khi chuyển tab
-    window.lastResult = null;
-    window.lastDisplayFn = null;
-}
-// Gắn sự kiện cho sidebar menu
-document.querySelectorAll('[data-page]').forEach(btn => {
-    btn.addEventListener('click', e => {
-        renderPage(btn.getAttribute('data-page'));
-    });
-});
-// Hàm setup lại event cho trang giải hệ phương trình
-function setupMatrixSolveEvents() {
-    // Lấy lại các DOM element mới sau khi render
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const matrixB_Input = document.getElementById('matrix-b-input');
-    const resultsArea = document.getElementById('results-area');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const errorMessage = document.getElementById('error-message');
-    // Gán event cho các nút giải hệ
-    document.getElementById('calculate-gj-btn').onclick = () => setupHptCalculation('/matrix/gauss-jordan', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-gauss-btn').onclick = () => setupHptCalculation('/matrix/gauss-elimination', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-lu-btn').onclick = () => setupHptCalculation('/matrix/lu-decomposition', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-    document.getElementById('calculate-cholesky-btn').onclick = () => setupHptCalculation('/matrix/cholesky', matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage);
-}
-// Hàm setup lại event cho trang SVD
-function setupMatrixSvdEvents() {
-    const matrixA_Input = document.getElementById('matrix-a-input');
-    const initMatrixInput = document.getElementById('svd-init-matrix-input');
-    const resultsArea = document.getElementById('results-area');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const errorMessage = document.getElementById('error-message');
-    document.getElementById('calculate-svd-btn').onclick = () => {
-        const matrixA = parseMatrix(matrixA_Input.value);
-        if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-        let initMatrix = undefined;
-        if (initMatrixInput && initMatrixInput.value.trim() !== '') {
-            initMatrix = parseMatrix(initMatrixInput.value);
-            if (initMatrix.error) { errorMessage.classList.remove('hidden'); errorMessage.textContent = initMatrix.error; resultsArea.innerHTML = ''; return; }
-        }
-        const body = { matrix_a: matrixA };
-        if (initMatrix) body.init_matrix = initMatrix;
-        handleCalculation('/matrix/svd', body);
-    };
-}
-
-// Sửa lại setupHptCalculation để nhận đúng input/result area
-function setupHptCalculation(endpoint, matrixA_Input, matrixB_Input, resultsArea, loadingSpinner, errorMessage) {
-    const matrixA = parseMatrix(matrixA_Input.value);
-    if (matrixA.error || matrixA.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixA.error || 'Ma trận A không được để trống.'; resultsArea.innerHTML = ''; return; }
-    const matrixB = parseMatrix(matrixB_Input.value);
-    if (matrixB.error || matrixB.length === 0) { errorMessage.classList.remove('hidden'); errorMessage.textContent = matrixB.error || 'Ma trận B không được để trống.'; resultsArea.innerHTML = ''; return; }
-    if (matrixA.length !== matrixB.length) { errorMessage.classList.remove('hidden'); errorMessage.textContent = `Số hàng của ma trận A (${matrixA.length}) và B (${matrixB.length}) phải bằng nhau.`; resultsArea.innerHTML = ''; return; }
-    handleCalculation(endpoint, { matrix_a: matrixA, matrix_b: matrixB });
-}
-
-// === DISPLAY FUNCTIONS ===
-function displayGenericHptResults(title, result) {
-    let html = `<h3 class="result-heading">${title}</h3>`;
-    if (result.message) {
-         html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">${result.message}</div>`;
-    }
-    if (result.transformation_message) {
-        html += `<p class="text-center text-gray-600 mb-4">${result.transformation_message}</p>`;
-    }
-
-    if (result.status === 'unique_solution') {
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm duy nhất X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
-    } else if (result.status === 'infinite_solutions') {
-        const { particular_solution, null_space_vectors, num_free_vars } = result.general_solution;
-        
-        let termHtml = '';
-        for (let i = 0; i < num_free_vars; i++) {
-            const v_k = null_space_vectors.map(row => [row[i]]);
-            termHtml += `&nbsp; + &nbsp; t<sub>${i+1}</sub> &nbsp; <div class="matrix-display !inline-block">${formatMatrix(v_k)}</div>`;
-        }
-
-        html += `
-            <div class="mb-8">
-                <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm Tổng Quát</h4>
-                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                    <div class="flex justify-center items-center flex-wrap">
-                        <span class="text-2xl mr-4">X &nbsp; = </span>
-                        <div class="matrix-display !inline-block" title="Nghiệm riêng Xp">${formatMatrix(particular_solution)}</div>
-                        <div class="flex justify-center items-center flex-wrap">
-                            ${termHtml}
-                        </div>
-                    </div>
-                </div>
-                <p class="text-center text-sm text-gray-500 mt-2">Trong đó ma trận đầu tiên là nghiệm riêng, các ma trận cột sau là vector cơ sở của không gian null, và t<sub>k</sub> là các tham số tự do.</p>
-            </div>
-        `;
-    } else if (result.status === 'no_solution' && (result.solution_matrix || (result.forward_steps && result.forward_steps.length > 0) ) ) {
-        const last_matrix = result.solution_matrix || result.forward_steps[result.forward_steps.length - 1].matrix;
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Dạng ma trận cuối cùng cho thấy sự mâu thuẫn:</h4><div class="matrix-display">${formatMatrix(last_matrix)}</div></div>`;
-    }
-    return html;
 }
 
 function displaySvdResults(result) {
     let html = `<h3 class="result-heading">Kết Quả Phân Tích SVD (A = UΣVᵀ)</h3>`;
-    // Nếu số cột của U, Sigma, V^T lớn (ví dụ > 8), hiển thị dọc, còn lại giữ dạng lưới ngang
     const uCols = result.U && result.U[0] ? result.U[0].length : 0;
     const sigmaCols = result.Sigma && result.Sigma[0] ? result.Sigma[0].length : 0;
     const vtCols = result.V_transpose && result.V_transpose[0] ? result.V_transpose[0].length : 0;
@@ -443,17 +308,38 @@ function displaySvdResults(result) {
             </div>`;
     }
     if (result.intermediate_steps) {
-        html += `
-            <div class="mt-10">
-                <h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3>
-                <div class="space-y-6">
-                    <div><h4 class="font-medium text-gray-700">Ma trận AᵀA</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.A_transpose_A)}</div></div>
-                    <div><h4 class="font-medium text-gray-700">Giá trị riêng của AᵀA (λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.eigenvalues_of_ATA.map(v => formatNumber(v)).join(', ')} ]</div></div>
-                    <div><h4 class="font-medium text-gray-700">Giá trị kỳ dị (σ = √λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.singular_values.map(v => formatNumber(v)).join(', ')} ]</div></div>
-                    <div><h4 class="font-medium text-gray-700">Ma trận V</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.V_matrix)}</div></div>
-                </div>
-            </div>
-        `;
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3><div class="space-y-6">`;
+        html += `<div><h4 class="font-medium text-gray-700">Ma trận AᵀA</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.A_transpose_A)}</div></div>`;
+        if (result.intermediate_steps.eigenvalues_of_ATA) {
+            html += `<div><h4 class="font-medium text-gray-700">Giá trị riêng của AᵀA (λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.eigenvalues_of_ATA.map(v => formatNumber(v)).join(', ')} ]</div></div>`;
+        }
+        if (result.intermediate_steps.singular_values) {
+            html += `<div><h4 class="font-medium text-gray-700">Giá trị kỳ dị (σ = √λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.singular_values.map(v => formatNumber(v)).join(', ')} ]</div></div>`;
+        }
+        if (result.intermediate_steps.V_matrix) {
+            html += `<div><h4 class="font-medium text-gray-700">Ma trận V</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.V_matrix)}</div></div>`;
+        }
+        if (result.intermediate_steps.steps) {
+            html += `<div class="mt-8"><h4 class="font-medium text-gray-700">Các bước lặp Power Method + Xuống thang</h4>`;
+            result.intermediate_steps.steps.forEach((step, idx) => {
+                html += `<div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                    <h5 class="font-medium text-gray-700 mb-2">Giá trị kỳ dị thứ ${step.singular_index} (σ ≈ ${formatNumber(step.singular_value)})</h5>
+                    <div class="mb-2 text-sm text-gray-600">Các bước lặp:</div>
+                    <ol class="list-decimal ml-6 mb-2">`;
+                step.lambda_steps.forEach((lam, i) => {
+                    html += `<li>λ<sub>${i+1}</sub> = ${formatNumber(lam)}, véctơ riêng: [${step.y_steps[i].map(formatNumber).join(', ')}]</li>`;
+                });
+                html += `</ol>
+                    <div class="mb-2 text-sm text-gray-600">Véctơ riêng cuối cùng (đã chuẩn hóa): [${step.right_vec.map(formatNumber).join(', ')}]</div>
+                    <div class="mb-2 text-sm text-gray-600">Ma trận deflation trước:</div>
+                    <div class="matrix-display">${formatMatrix(step.deflation_matrix_before)}</div>
+                    <div class="mb-2 text-sm text-gray-600">Ma trận deflation sau:</div>
+                    <div class="matrix-display">${formatMatrix(step.deflation_matrix_after)}</div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
     }
     resultsArea.innerHTML = html;
 }
@@ -554,6 +440,46 @@ function displayCholeskyResults(result) {
     html += `<div class="mt-6"><h4 class="font-medium text-center text-gray-700">Giải Uᵀy = d, ta được ma trận Y:</h4><div class="matrix-display">${formatMatrix(result.intermediate_y)}</div></div>`;
     html += `</div>`;
     resultsArea.innerHTML = html;
+}
+
+function displayDanilevskyResults(result) {
+    let html = `<h3 class="result-heading">Kết Quả Tìm Giá Trị Riêng (Danielevsky)</h3>`;
+    html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Giá trị riêng:</h4><div class="matrix-display">[${result.eigenvalues.map(formatNumber).join(', ')}]</div></div>`;
+    html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Vector riêng:</h4><div class="matrix-display">${formatMatrix(result.eigenvectors)}</div></div>`;
+    if (result.steps && result.steps.length > 0) {
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
+        result.steps.forEach((step, i) => {
+            html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.desc || `Bước ${i+1}`}</h4><div class="matrix-display">${formatMatrix(step.matrix)}</div></div>`;
+        });
+        html += `</div></div>`;
+    }
+    resultsArea.innerHTML = html;
+}
+
+// Hiển thị kết quả hệ phương trình dạng tổng quát (dùng cho Gauss, Gauss-Jordan, LU, Cholesky)
+function displayGenericHptResults(title, result) {
+    let html = `<h3 class="result-heading">${title}</h3>`;
+    if (result.status === 'unique_solution') {
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
+    } else if (result.status === 'infinite_solutions') {
+        let gs = result.general_solution;
+        let Xp = gs?.particular_solution || [];
+        let nullspace = gs?.null_space_vectors || [];
+        let num_free_vars = (Array.isArray(nullspace) && nullspace.length > 0 && Array.isArray(nullspace[0])) ? nullspace[0].length : 0;
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm tổng quát:</h4>`;
+        html += `<div class="flex justify-center items-center flex-wrap"><span class="text-2xl mr-4">X = </span><div class="matrix-display !inline-block" title="Nghiệm riêng Xp">${formatMatrix(Xp)}</div>`;
+        for (let i = 0; i < num_free_vars; i++) {
+            const v_k = nullspace.map(row => [row[i]]);
+            html += `&nbsp; + &nbsp; t<sub>${i+1}</sub> &nbsp; <div class="matrix-display !inline-block">${formatMatrix(v_k)}</div>`;
+        }
+        html += `</div></div>`;
+        html += `<p class="text-center text-sm text-gray-500 mt-2">Xp là nghiệm riêng (mỗi cột ứng với một vế phải), các ma trận cột sau là vector cơ sở của không gian null, và t<sub>k</sub> là các tham số tự do.</p>`;
+    } else if (result.status === 'no_solution') {
+        html += `<div class="text-center text-red-600 font-semibold text-lg">Hệ phương trình vô nghiệm.</div>`;
+    } else {
+        html += `<div class="text-center text-gray-600">Không xác định được trạng thái nghiệm.</div>`;
+    }
+    return html;
 }
 
 // Đảm bảo bảng ma trận luôn scroll ngang nếu quá rộng
