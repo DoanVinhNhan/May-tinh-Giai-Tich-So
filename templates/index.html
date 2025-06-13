@@ -24,9 +24,10 @@
                 <li>
                     <button class="w-full text-left px-3 py-2 rounded hover:bg-blue-50 font-medium text-gray-800" data-page="matrix">Máy tính ma trận</button>
                     <ul class="ml-4 mt-1 space-y-1">
-                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve">Giải hệ phương trình</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve-direct">Giải hệ phương trình</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve-iterative">PP Lặp - Giải hệ phương trình</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-direct">Tính ma trận nghịch đảo</button></li>
-                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-iterative">Tính ma trận nghịch đảo (lặp)</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-iterative">PP Lặp - Tính ma trận nghịch đảo</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Phân tích SVD</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-danilevsky">Tìm giá trị riêng</button></li>
                     </ul>
@@ -70,7 +71,7 @@ sidebarToggle.addEventListener('click', () => {
 });
 </script>
 
-<div id="matrix-solve-page" class="hidden">
+<div id="matrix-solve-direct-page" class="hidden">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
             <label for="matrix-a-input-hpt" class="block text-sm font-medium text-gray-700">Ma trận A</label>

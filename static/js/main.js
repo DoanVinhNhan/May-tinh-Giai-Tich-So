@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // Khi vừa load trang, tự động render trang mặc định là matrix-solve
-    renderPage('matrix-solve');
+    // Khi vừa load trang, tự động render trang mặc định là matrix-solve-direct
+    renderPage('matrix-solve-direct');
     // Gắn lại event cho sidebar menu (đảm bảo khi chuyển sang SVD sẽ gắn event đúng)
     document.querySelectorAll('[data-page]').forEach(btn => {
         btn.addEventListener('click', e => {
@@ -238,14 +238,14 @@ function renderPage(page) {
     let setupFunction = null;
     let title = 'Máy tính Giải tích số';
 
-    if (page === 'matrix-solve') {
-        pageHtml = document.getElementById('matrix-solve-page').innerHTML;
+    if (page === 'matrix-solve-direct') {
+        pageHtml = document.getElementById('matrix-solve-direct-page').innerHTML;
         setupFunction = setupMatrixSolveEvents;
         title = 'Giải Hệ Phương Trình Tuyến Tính';
     } else if (page === 'matrix-inverse-direct') {
         pageHtml = document.getElementById('matrix-inverse-direct-page').innerHTML;
         setupFunction = setupMatrixInverseDirectEvents;
-        title = 'Tính Ma Trận Nghịch Đảo (Trực tiếp)';
+        title = 'Tính Ma Trận Nghịch Đảo';
     } else if (page === 'matrix-inverse-iterative') {
         pageHtml = document.getElementById('matrix-inverse-iterative-page').innerHTML;
         setupFunction = setupMatrixInverseIterativeEvents;
@@ -257,7 +257,7 @@ function renderPage(page) {
     } else if (page === 'matrix-danilevsky') {
         pageHtml = document.getElementById('matrix-danilevsky-page').innerHTML;
         setupFunction = setupMatrixDanilevskyEvents;
-        title = 'Tìm Trị Riêng & Vector Riêng (Danilevsky)';
+        title = 'Tìm Trị Riêng & Vector Riêng';
     } else if (page === 'nonlinear-solve') {
         pageHtml = document.getElementById('nonlinear-solve-page').innerHTML;
         setupFunction = setupNonlinearSolveEvents;
