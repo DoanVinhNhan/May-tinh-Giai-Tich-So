@@ -28,6 +28,11 @@ from numerical_methods.root_finding.newton import solve_newton
 from numerical_methods.root_finding.simple_iteration import solve_simple_iteration
 from utils.expression_parser import get_derivative
 
+from numerical_methods.nonlinear_systems.newton import solve_newton_system
+from numerical_methods.nonlinear_systems.newton_modified import solve_newton_modified_system
+from numerical_methods.nonlinear_systems.simple_iteration import solve_simple_iteration_system
+
+
 app = Flask(__name__)
 CORS(app)
 
@@ -226,6 +231,40 @@ def solve_nonlinear_equation():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f'Đã xảy ra lỗi không xác định: {e}'})
+
+@app.route('/nonlinear-system/solve', methods=['POST'])
+def solve_nonlinear_system():
+    data = request.get_json()
+    try:
+        method = data.get('method')
+        n = int(data.get('n'))
+        expressions = data.get('expressions') # list of strings
+        x0 = [float(x) for x in data.get('x0')] # list of numbers
+        stop_option = data.get('stop_option') # 'absolute_error', 'relative_error', 'iterations'
+        stop_value = float(data.get('stop_value'))
+
+        if stop_option == 'iterations':
+            stop_value = int(stop_value)
+
+        result = {}
+        if method == 'newton':
+            result = solve_newton_system(n, expressions, x0, stop_option, stop_value)
+        elif method == 'newton_modified':
+            result = solve_newton_modified_system(n, expressions, x0, stop_option, stop_value)
+        elif method == 'simple_iteration':
+            a0 = [float(a) for a in data.get('a0')]
+            b0 = [float(b) for b in data.get('b0')]
+            result = solve_simple_iteration_system(n, expressions, x0, a0, b0, stop_option, stop_value)
+        else:
+            return jsonify({"success": False, "error": "Phương pháp không hợp lệ."}), 400
+
+        return jsonify(result)
+
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False, 'error': f'Dữ liệu đầu vào không hợp lệ: {e}. Vui lòng kiểm tra lại các con số.'}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Đã xảy ra lỗi không xác định: {e}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

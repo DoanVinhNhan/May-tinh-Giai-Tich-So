@@ -34,6 +34,10 @@
                 <li>
                     <button class="w-full text-left px-3 py-2 rounded hover:bg-green-50 font-medium text-gray-800" data-page="nonlinear-solve">Giải phương trình f(x)=0</button>
                 </li>
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-yellow-50 font-medium text-gray-800" data-page="nonlinear-system-solve">Giải hệ phương trình phi tuyến</button>
+                </li>
+
             </ul>
         </nav>
     </aside>
@@ -193,12 +197,12 @@ sidebarToggle.addEventListener('click', () => {
 
         <div id="f-expression-group">
             <label for="f-expression-input" class="block text-sm font-medium text-gray-700">Biểu thức f(x) (dạng LaTeX)</label>
-            <input id="f-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="e.g., x^3 - x - 2">
+            <input id="f-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="x^3 - x - 2">
             <div id="f-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center text-lg"></div>
         </div>
         <div id="phi-expression-group" style="display:none;">
             <label for="phi-expression-input" class="block text-sm font-medium text-gray-700">Hàm lặp φ(x) (dạng LaTeX)</label>
-            <input id="phi-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="e.g., \sqrt[3]{x+2}">
+            <input id="phi-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="\sqrt[3]{x+2}">
             <div id="phi-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center text-lg"></div>
         </div>
 
@@ -243,6 +247,58 @@ sidebarToggle.addEventListener('click', () => {
     
     <div class="mt-8 mb-8">
         <button id="calculate-nonlinear-btn" class="action-btn bg-green-600 hover:bg-green-700">Giải</button>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="nonlinear-system-solve-page" class="hidden">
+    <div class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-1">
+                <label for="ns-method-select" class="block text-sm font-medium text-gray-700">Phương pháp</label>
+                <select id="ns-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm p-2">
+                    <option value="newton">Newton</option>
+                    <option value="newton_modified">Newton Modified</option>
+                    <option value="simple_iteration">Lặp đơn</option>
+                </select>
+            </div>
+            <div>
+                <label for="ns-stop-option-select" class="block text-sm font-medium text-gray-700">Điều kiện dừng</label>
+                <select id="ns-stop-option-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
+                    <option value="absolute_error">Sai số tuyệt đối</option>
+                    <option value="relative_error">Sai số tương đối</option>
+                    <option value="iterations">Số lần lặp</option>
+                </select>
+            </div>
+            <div>
+                <label for="ns-stop-value-input" class="block text-sm font-medium text-gray-700">Giá trị (ε, δ, hoặc N)</label>
+                <input id="ns-stop-value-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="0.0001">
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label id="ns-expressions-label" class="block text-sm font-medium text-gray-700">Hệ phương trình F(X) = 0 (dạng LaTeX)</label>
+                <textarea id="ns-expressions-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="x_1^2 + x_2^2 - 1&#10;x_1^2 - x_2"></textarea>
+                
+                <div id="ns-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[80px] flex flex-col items-center justify-center text-lg space-y-2"></div>
+                <div id="ns-domain-group" class="mt-4" style="display:none;">
+                     <label class="block text-sm font-medium text-gray-700">Miền hộp D = [a, b] (mỗi miền một dòng cách nhau bằng khoảng trắng)</label>
+                     <textarea id="ns-domain-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0, 1&#10;0 1"></textarea>
+                </div>
+            </div>
+            <div>
+                 <label for="ns-x0-input" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀ (mỗi giá trị một dòng)</label>
+                 <textarea id="ns-x0-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0.5&#10;0.5"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-8 mb-8">
+        <button id="calculate-ns-btn" class="action-btn bg-yellow-600 hover:bg-yellow-700">Giải Hệ Phi Tuyến</button>
     </div>
 
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>

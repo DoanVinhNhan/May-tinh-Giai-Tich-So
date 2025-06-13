@@ -16,6 +16,54 @@ document.addEventListener('DOMContentLoaded', function () {
 let displayPrecision = 4; // Số chữ số sau dấu phẩy mặc định
 
 // === HELPER FUNCTIONS ===
+    // --- Hàm chuyển đổi LaTeX sang Python ---
+function latexToPython(latex) {
+    if (!latex) return "";
+    let pyExpr = latex;
+
+    // Xử lý các trường hợp đặc biệt trước
+    // Căn bậc n: \sqrt[n]{x} -> x**(1/n)
+    pyExpr = pyExpr.replace(/\\sqrt\[(.*?)\]\{(.*?)\}/g, '($2)**(1/($1))');
+    // Căn bậc 2: \sqrt{x} -> sqrt(x)
+    pyExpr = pyExpr.replace(/\\sqrt\{(.*?)\}/g, 'sqrt($1)');
+    // Phân số: \frac{a}{b} -> (a)/(b)
+    pyExpr = pyExpr.replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '($1)/($2)');
+    // Log cơ số a: \log_{a}{b} -> log(b, a) (Sửa lỗi logic)
+    pyExpr = pyExpr.replace(/\\log_\{(.*?)\}\{(.*?)\}/g, 'log($2, $1)');
+    // Biến có chỉ số: x_1, x_{23} -> x1, x23
+    pyExpr = pyExpr.replace(/x_\{?(\d+)\}?/g, 'x$1');
+
+    // Xử lý các hàm chuẩn
+    pyExpr = pyExpr.replace(/\\(sin|cos|tan|asin|acos|atan|ln|exp|abs|pi)/g, '$1');
+
+    // Xử lý các toán tử
+    pyExpr = pyExpr.replace(/\^/g, '**');      // Lũy thừa
+    pyExpr = pyExpr.replace(/\\cdot/g, '*');   // Nhân
+    
+    // Xóa các dấu ngoặc nhọn còn lại của LaTeX
+    pyExpr = pyExpr.replace(/\{/g, '(');
+    pyExpr = pyExpr.replace(/\}/g, ')');
+    
+    // Xóa các khoảng trắng thừa
+    pyExpr = pyExpr.replace(/\s+/g, ' ');
+
+    return pyExpr;
+}
+function formatLatexMatrix(data) {
+    if (!Array.isArray(data) || !Array.isArray(data[0])) return '';
+    let tableHtml = '<table class="matrix-table">';
+    data.forEach(row => {
+        tableHtml += '<tr>';
+        row.forEach(cell => {
+            // Cell chứa chuỗi LaTeX thuần túy
+            const escapedCell = cell.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            tableHtml += `<td>${escapedCell}</td>`;
+        });
+        tableHtml += '</tr>';
+    });
+    tableHtml += '</table>';
+    return `<div class="matrix-container">${tableHtml}</div>`;
+}
 function parseMatrix(matrixString) {
     try {
         const rows = matrixString.trim().split('\n').filter(r => r.trim() !== '');
@@ -69,7 +117,7 @@ function formatMatrix(data, precision = displayPrecision) {
         tableHtml += '</tr>';
     });
     tableHtml += '</table>';
-    return `<div class="matrix-container">${tableHtml}</div>`;
+    return tableHtml;
 }
 
 
@@ -106,9 +154,14 @@ async function handleCalculation(endpoint, body) {
         });
 
         if (!response.ok) {
-            const text = await response.text();
-            displayError(`Lỗi server (${response.status}): ${text}`);
-            console.error('Lỗi server:', response.status, text);
+            let errorText = `Lỗi Server: ${response.status} ${response.statusText}`;
+            try {
+                const errorResult = await response.json();
+                errorText = errorResult.error || errorText;
+            } catch (e) {
+                // Do nothing if response is not JSON
+            }
+            displayError(errorText);
             return;
         }
 
@@ -129,7 +182,6 @@ async function handleCalculation(endpoint, body) {
             return;
         }
         
-        // --- START: CẬP NHẬT DISPLAY MAP ---
         const displayMap = {
             'svd': wrapDisplay(displaySvdResults),
             'gauss-jordan': wrapDisplay(displayGaussJordanResults),
@@ -137,26 +189,29 @@ async function handleCalculation(endpoint, body) {
             'lu-decomposition': wrapDisplay(displayLuResults),
             'cholesky': wrapDisplay(displayCholeskyResults),
             'danilevsky': wrapDisplay(displayDanilevskyResults),
-            'solve': wrapDisplay(displayNonlinearEquationResults),
-            'lu': wrapDisplay(displayInverseResults), // Dùng chung cho các pp nghịch đảo
+            'solve': wrapDisplay(displayNonlinearEquationResults), 
+            'lu': wrapDisplay(displayInverseResults), 
             'bordering': wrapDisplay(displayInverseResults),
             'jacobi': wrapDisplay(displayInverseResults),
-            'newton': wrapDisplay(displayInverseResults)
+            'newton': wrapDisplay(displayInverseResults),
+            'nonlinear-system/solve': wrapDisplay(displayNonlinearSystemResults)
         };
         
-        // Endpoint `gauss-jordan` bị trùng, cần phân biệt
         let key = endpoint.split('/').pop();
-        if (endpoint.includes('/matrix/inverse/')) {
-            // Đây là hàm display chung cho các pp nghịch đảo
+        
+        if (endpoint === '/nonlinear-system/solve') {
+            key = 'nonlinear-system/solve';
+        } else if (endpoint.includes('/matrix/inverse/')) {
             displayMap[key](result, key);
+            return; 
         }
-        else if (displayMap[key]) {
+        
+        if (displayMap[key]) {
             displayMap[key](result);
         } else {
              document.getElementById('results-area').innerHTML = '<div class="text-red-600">Không có hàm hiển thị kết quả phù hợp cho endpoint này.</div>';
              console.warn('Không có hàm hiển thị cho endpoint:', endpoint);
         }
-        // --- END: CẬP NHẬT DISPLAY MAP ---
 
     } catch (err) {
         resetDisplay();
@@ -186,28 +241,31 @@ function renderPage(page) {
     if (page === 'matrix-solve') {
         pageHtml = document.getElementById('matrix-solve-page').innerHTML;
         setupFunction = setupMatrixSolveEvents;
-        title = 'Giải hệ phương trình tuyến tính';
-    } else if (page === 'matrix-inverse-direct') { // MỚI
+        title = 'Giải Hệ Phương Trình Tuyến Tính';
+    } else if (page === 'matrix-inverse-direct') {
         pageHtml = document.getElementById('matrix-inverse-direct-page').innerHTML;
         setupFunction = setupMatrixInverseDirectEvents;
-        title = 'Tính ma trận nghịch đảo (PP Trực tiếp)';
-    } else if (page === 'matrix-inverse-iterative') { // MỚI
+        title = 'Tính Ma Trận Nghịch Đảo (Trực tiếp)';
+    } else if (page === 'matrix-inverse-iterative') {
         pageHtml = document.getElementById('matrix-inverse-iterative-page').innerHTML;
         setupFunction = setupMatrixInverseIterativeEvents;
-        title = 'Tính ma trận nghịch đảo (PP Lặp)';
-    }
-    else if (page === 'matrix-svd') {
+        title = 'Tính Ma Trận Nghịch Đảo (Lặp)';
+    } else if (page === 'matrix-svd') {
         pageHtml = document.getElementById('matrix-svd-page').innerHTML;
         setupFunction = setupMatrixSvdEvents;
-        title = 'Phân tích giá trị kỳ dị (SVD)';
+        title = 'Phân Rã Giá Trị Suy Biến (SVD)';
     } else if (page === 'matrix-danilevsky') {
         pageHtml = document.getElementById('matrix-danilevsky-page').innerHTML;
         setupFunction = setupMatrixDanilevskyEvents;
-        title = 'Tìm giá trị riêng (Danilevsky)';
+        title = 'Tìm Trị Riêng & Vector Riêng (Danilevsky)';
     } else if (page === 'nonlinear-solve') {
         pageHtml = document.getElementById('nonlinear-solve-page').innerHTML;
         setupFunction = setupNonlinearSolveEvents;
         title = 'Giải phương trình phi tuyến f(x) = 0';
+    } else if (page === 'nonlinear-system-solve') {
+        pageHtml = document.getElementById('nonlinear-system-solve-page').innerHTML;
+        setupFunction = setupNonlinearSystemSolveEvents;
+        title = 'Giải Hệ Phương Trình Phi Tuyến';
     } else {
         pageHtml = '<div class="text-center text-gray-500">Chọn một chức năng ở menu bên trái.</div>';
     }
@@ -226,16 +284,27 @@ function renderPage(page) {
 // Gắn sự kiện cho sidebar menu
 document.querySelectorAll('[data-page]').forEach(btn => {
     btn.addEventListener('click', e => {
-        // Remove active class from all buttons
-        document.querySelectorAll('[data-page]').forEach(b => b.classList.remove('bg-blue-100', 'text-blue-700', 'bg-green-100', 'text-green-700'));
-        // Add active class to clicked button
+        // BƯỚC 1: Xóa màu active khỏi TẤT CẢ các nút
+        // Dòng code này sẽ tìm mọi phần tử có thuộc tính [data-page] và xóa hết các lớp màu của chúng.
+        document.querySelectorAll('[data-page]').forEach(b => {
+            b.classList.remove('bg-blue-100', 'text-blue-700');
+            b.classList.remove('bg-green-100', 'text-green-700');
+            b.classList.remove('bg-yellow-100', 'text-yellow-700');
+        });
+        
+        // BƯỚC 2: Thêm màu active cho nút vừa được click
         const button = e.currentTarget;
         const page = button.getAttribute('data-page');
+
         if (page.startsWith('matrix')) {
             button.classList.add('bg-blue-100', 'text-blue-700');
-        } else {
+        } else if (page === 'nonlinear-solve') {
             button.classList.add('bg-green-100', 'text-green-700');
+        } else if (page === 'nonlinear-system-solve') {
+            button.classList.add('bg-yellow-100', 'text-yellow-700');
         }
+
+        // BƯỚC 3: Hiển thị nội dung trang tương ứng
         renderPage(page);
     });
 });
@@ -405,38 +474,6 @@ function setupNonlinearSolveEvents() {
     // Previews
     const fPreview = document.getElementById('f-latex-preview');
     const phiPreview = document.getElementById('phi-latex-preview');
-
-    // --- Hàm chuyển đổi LaTeX sang Python ---
-    function latexToPython(latex) {
-        if (!latex) return "";
-        let pyExpr = latex;
-
-        // Xử lý các trường hợp đặc biệt trước
-        // Căn bậc n: \sqrt[n]{x} -> x**(1/n)
-        pyExpr = pyExpr.replace(/\\sqrt\[(.*?)\]\{(.*?)\}/g, '($2)**(1/($1))');
-        // Căn bậc 2: \sqrt{x} -> sqrt(x)
-        pyExpr = pyExpr.replace(/\\sqrt\{(.*?)\}/g, 'sqrt($1)');
-        // Phân số: \frac{a}{b} -> (a)/(b)
-        pyExpr = pyExpr.replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '($1)/($2)');
-        // Log cơ số a: \log_{a}{b} -> log(b, a)
-        pyExpr = pyExpr.replace(/\\log_\{(.*?)\}\{(.*?)\}/g, 'log($2, $1)');
-
-        // Xử lý các hàm chuẩn
-        pyExpr = pyExpr.replace(/\\(sin|cos|tan|asin|acos|atan|ln|exp|abs)/g, '$1');
-
-        // Xử lý các toán tử
-        pyExpr = pyExpr.replace(/\^/g, '**');      // Lũy thừa
-        pyExpr = pyExpr.replace(/\\cdot/g, '*');   // Nhân
-        
-        // Xóa các dấu ngoặc nhọn còn lại của LaTeX
-        pyExpr = pyExpr.replace(/\{/g, '(');
-        pyExpr = pyExpr.replace(/\}/g, ')');
-        
-        // Xóa các khoảng trắng thừa
-        pyExpr = pyExpr.replace(/\s+/g, ' ');
-
-        return pyExpr;
-    }
 
     // --- Hàm render LaTeX (live preview) ---
     function renderLatex(inputElement, previewElement) {
@@ -880,4 +917,217 @@ function displayGenericHptResults(title, result) {
         }
     }
     return html;
+}
+function setupNonlinearSystemSolveEvents() {
+    // DOM elements
+    const methodSelect = document.getElementById('ns-method-select');
+    const expressionsInput = document.getElementById('ns-expressions-input');
+    const previewDiv = document.getElementById('ns-latex-preview');
+    const x0Input = document.getElementById('ns-x0-input');
+    const domainGroup = document.getElementById('ns-domain-group');
+    const domainInput = document.getElementById('ns-domain-input');
+    const expressionsLabel = document.getElementById('ns-expressions-label');
+    const calculateBtn = document.getElementById('calculate-ns-btn');
+
+    const placeholders = {
+        newton: "x_1^2 + x_2^2 - 1\nx_1^2 - x_2",
+        newton_modified: "x_1^2 + x_2^2 - 1\nx_1^2 - x_2",
+        simple_iteration: "\\sqrt{1 - x_2^2}\n\\sqrt{x_1}"
+    };
+
+    // Hàm render LaTeX cho hệ phương trình (mỗi dòng một biểu thức)
+    function renderSystemLatex() {
+        if (!expressionsInput || !previewDiv) return;
+
+        const latexLines = expressionsInput.value.trim().split('\n');
+        previewDiv.innerHTML = '';
+        previewDiv.classList.remove('text-red-500', 'items-start');
+        previewDiv.classList.add('items-center');
+
+        if (expressionsInput.value.trim() === "") {
+            return;
+        }
+        
+        let hasError = false;
+        latexLines.forEach(line => {
+            if (line.trim() === "") {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.innerHTML = '&nbsp;';
+                previewDiv.appendChild(emptyDiv);
+                return;
+            };
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'w-full text-center';
+            try {
+                katex.render(line, lineDiv, {
+                    throwOnError: true,
+                    displayMode: false
+                });
+            } catch (error) {
+                lineDiv.textContent = `Lỗi cú pháp: "${line}"`;
+                lineDiv.className = 'w-full text-left text-red-500 text-sm';
+                hasError = true;
+            }
+            previewDiv.appendChild(lineDiv);
+        });
+
+        if (hasError) {
+             previewDiv.classList.remove('items-center');
+             previewDiv.classList.add('items-start');
+        }
+    }
+    
+    function updateUIVisibility() {
+        const method = methodSelect.value;
+        expressionsInput.placeholder = placeholders[method];
+        if (method === 'simple_iteration') {
+            expressionsLabel.innerHTML = 'Hệ hàm lặp <span class="font-mono text-sm">X = &phi;(X)</span> (dạng LaTeX)';
+            domainGroup.style.display = 'block';
+            domainInput.placeholder = "0 1\n0 1";
+        } else {
+            expressionsLabel.innerHTML = 'Hệ phương trình <span class="font-mono text-sm">F(X) = 0</span> (dạng LaTeX)';
+            domainGroup.style.display = 'none';
+        }
+        renderSystemLatex();
+    }
+
+    // Event listeners
+    methodSelect.addEventListener('change', updateUIVisibility);
+    expressionsInput.addEventListener('input', renderSystemLatex);
+
+    calculateBtn.addEventListener('click', () => {
+        const method = methodSelect.value;
+        
+        // Lấy biểu thức LaTeX và chuyển đổi sang cú pháp Python
+        const latexExpressions = expressionsInput.value.trim().split('\n').filter(line => line.trim() !== '');
+        const expressions = latexExpressions.map(latexToPython);
+        const n = expressions.length;
+        if (n === 0) {
+            displayError('Vui lòng nhập ít nhất một hàm số.');
+            return;
+        }
+
+        const x0_lines = x0Input.value.trim().split('\n').filter(line => line.trim() !== '');
+        if (x0_lines.length !== n) {
+            displayError(`Số lượng giá trị ban đầu (${x0_lines.length}) không khớp với số phương trình (${n}).`);
+            return;
+        }
+        const x0 = x0_lines.map(val => parseFloat(val.trim()));
+        if (x0.some(isNaN)) {
+            displayError('Giá trị ban đầu X₀ chứa giá trị không hợp lệ.');
+            return;
+        }
+
+        const body = {
+            n: n,
+            method: method,
+            expressions: expressions,
+            x0: x0,
+            stop_option: document.getElementById('ns-stop-option-select').value,
+            stop_value: document.getElementById('ns-stop-value-input').value,
+        };
+
+        if (method === 'simple_iteration') {
+            const domain_lines = domainInput.value.trim().split('\n').filter(line => line.trim() !== '');
+            if (domain_lines.length !== n) {
+                displayError(`Số lượng miền D (${domain_lines.length}) không khớp với số phương trình (${n}).`);
+                return;
+            }
+            let a0 = [];
+            let b0 = [];
+            for (const line of domain_lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
+                    displayError(`Miền D có dòng không hợp lệ: "${line}". Cần 2 số cách nhau bằng dấu cách.`);
+                    return;
+                }
+                a0.push(parseFloat(parts[0]));
+                b0.push(parseFloat(parts[1]));
+            }
+            body.a0 = a0;
+            body.b0 = b0;
+        }
+        handleCalculation('/nonlinear-system/solve', body);
+    });
+    updateUIVisibility();
+}
+function displayNonlinearSystemResults(result) {
+    const resultsArea = document.getElementById('results-area');
+    let html = `<h3 class="result-heading">Kết Quả Giải Hệ Phi Tuyến</h3>`;
+
+    if (result.message) {
+        html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-green-50 rounded-lg shadow-inner">${result.message}</div>`;
+    }
+
+    // Hiển thị nghiệm
+    if (result.solution) {
+        const solMatrix = result.solution.map(v => [v]);
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X ≈</h4><div class="matrix-display">${formatMatrix(solMatrix, 6)}</div></div>`;
+    }
+
+    // Hiển thị các thông tin chẩn đoán
+    let diagnosticHtml = '';
+    if (result.jacobian_matrix_latex) {
+        diagnosticHtml += `<div class="p-4 bg-gray-50 rounded-lg flex flex-col">
+                        <h4 class="font-semibold text-gray-700 text-center mb-2">Ma trận Jacobi J(X)</h4>
+                        <div id="jacobian-matrix-container" class="flex-grow flex items-center justify-center">${formatLatexMatrix(result.jacobian_matrix_latex)}</div>
+                     </div>`;
+    }
+    if (result.J0_inv_matrix) {
+        diagnosticHtml += `<div class="p-4 bg-gray-50 rounded-lg flex flex-col">
+                    <h4 class="font-semibold text-gray-700 text-center mb-2">Ma trận J(X₀)⁻¹</h4>
+                    <div class="flex-grow flex items-center justify-center">${formatMatrix(result.J0_inv_matrix, 5)}</div>
+                 </div>`;
+    }
+    // Các thông tin khác có thể thêm vào đây
+    
+    if (diagnosticHtml) {
+        // Thay đổi ở đây: Dùng flex, flex-wrap và justify-center
+        html += `<div class="flex flex-wrap justify-center gap-6 mb-8">
+                    ${diagnosticHtml}
+                 </div>`;
+    }
+
+    // Hiển thị bảng lặp
+    if (result.steps && result.steps.length > 0) {
+        html += `<div class="mt-10"><h3 class="result-heading">Bảng Các Bước Lặp</h3>`;
+        const headers = Object.keys(result.steps[0]);
+        html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50"><tr>`;
+        headers.forEach(header => {
+            html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider font-mono">${header}</th>`;
+        });
+        html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+        // --- PHẦN SỬA LỖI ---
+        result.steps.forEach(step => {
+            html += `<tr>`;
+            // Vòng lặp đúng: duyệt qua tất cả headers
+            headers.forEach(header => {
+                 const value = step[header];
+                 html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(value, 6)}</td>`;
+            });
+            html += `</tr>`;
+        });
+        // --- KẾT THÚC PHẦN SỬA LỖI ---
+
+        html += `</tbody></table></div></div>`;
+    }
+    
+    resultsArea.innerHTML = html;
+    
+    // Render KaTeX cho ma trận Jacobi
+    if (result.jacobian_matrix_latex) {
+        const container = document.getElementById('jacobian-matrix-container');
+        if (container) {
+            container.querySelectorAll('td').forEach(cell => {
+                try {
+                    katex.render(cell.textContent, cell, { 
+                        throwOnError: false, 
+                        displayMode: false 
+                    });
+                } catch(e) { console.error('Lỗi render KaTeX:', e); }
+            });
+        }
+    }
 }

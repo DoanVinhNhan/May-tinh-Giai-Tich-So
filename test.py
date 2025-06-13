@@ -1,131 +1,74 @@
 import numpy as np
+import os
+import sys
 
-#-------------------------------------------------------------------------------
-# Mã nguồn thuật toán Danilevsky (Phiên bản sửa lỗi triệt để)
-#-------------------------------------------------------------------------------
+# Thêm đường dẫn của dự án vào sys.path để có thể import các module
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-def danilevsky_algorithm(A):
-    """
-    Thực hiện thuật toán Danilevsky.
-    Được cấu trúc lại thành 2 pha để đảm bảo tính chính xác.
-    1. Pha biến đổi: Đưa ma trận về dạng chéo khối Frobenius.
-    2. Pha trích xuất: Phân tích ma trận kết quả để tìm tất cả các giá trị riêng.
-    """
-    if A.shape[0] != A.shape[1]:
-        raise ValueError("Ma trận đầu vào phải là ma trận vuông")
+# Import hàm giải thuật Lặp đơn
+try:
+    from numerical_methods.nonlinear_systems.simple_iteration import solve_simple_iteration_system
+except ImportError as e:
+    print("!!! LỖI QUAN TRỌNG: Không thể import module solve_simple_iteration_system. !!!")
+    print(f"Lỗi chi tiết: {e}")
+    sys.exit(1)
 
-    n = A.shape[0]
-    S = A.copy().astype(np.complex128)
+# --- Định nghĩa bài toán kiểm thử HỘI TỤ ---
 
-    # --- PHA 1: BIẾN ĐỔI MA TRẬN ---
-    m = n
-    while m > 1:
-        k = m - 1
+# Dạng lặp X = φ(X) đã được biến đổi để đảm bảo hội tụ
+expressions_phi_convergent = [
+    "(13 + x2) / 4",
+    "(5 + x1) / 4"
+]
+
+# Các tham số
+initial_guess = [0.0, 0.0]  # Bắt đầu từ [0, 0]
+tolerance = 1e-7
+stop_mode = "absolute_error"
+max_iter = 50
+
+# Miền D để kiểm tra điều kiện hội tụ.
+# Nghiệm là (3.8, 2.2) nên ta có thể chọn miền D rộng hơn, ví dụ [0, 5] x [0, 5]
+domain_a = [0.0, 0.0]
+domain_b = [5.0, 5.0]
+
+
+# --- Hàm hỗ trợ in kết quả ---
+def print_results(method_name, result):
+    print("\n" + "="*20 + f" Kết quả cho: {method_name} " + "="*20)
+    if result and result.get("success"):
+        solution = result.get("solution")
+        iterations = result.get("iterations")
+        contraction_factor = result.get("contraction_factor_K")
+        solution_np = np.array(solution)
         
-        # Nếu phần tử mốc khác 0, thực hiện biến đổi
-        if not np.isclose(S[k, k - 1], 0):
-            M = np.eye(n, dtype=np.complex128)
-            M[k - 1, :] = S[k, :]
-            try:
-                M_inv = np.linalg.inv(M)
-                S = M_inv @ S @ M
-            except np.linalg.LinAlgError:
-                # Nếu không biến đổi được, coi như suy biến và bỏ qua
-                # để pha trích xuất xử lý sau
-                m = k 
-                continue
-            m = m - 1
-            continue
-        else:
-            # Nếu phần tử mốc bằng 0, tìm cột để hoán vị
-            s = -1
-            for j in range(k - 1):
-                if not np.isclose(S[k, j], 0):
-                    s = j
-                    break
-            
-            # Nếu tìm thấy cột để hoán vị, thực hiện và lặp lại
-            if s != -1:
-                C = np.eye(n, dtype=np.complex128)
-                C[:, [s, k - 1]] = C[:, [k - 1, s]]
-                S = C @ S @ C
-                continue
-            else:
-                # Nếu không hoán vị được, đây là trường hợp suy biến
-                # Giảm kích thước bài toán và để pha trích xuất xử lý
-                m = k
-                continue
-
-    # --- PHA 2: TRÍCH XUẤT GIÁ TRỊ RIÊNG TỪ MA TRẬN KẾT QUẢ ---
-    all_eigenvalues = []
-    end_idx = n
-    i = n - 1
-    while i >= 0:
-        # Một khối bắt đầu tại hàng `i`. Tìm xem nó kéo dài đến đâu.
-        # Bên trong một khối Frobenius, các phần tử S[j, j-1] phải bằng 1.
-        start_idx = i
-        while start_idx > 0 and np.isclose(S[start_idx, start_idx - 1], 1.0):
-            start_idx -= 1
-
-        # Đã tìm thấy một khối từ [start_idx, end_idx)
-        block = S[start_idx:end_idx, start_idx:end_idx]
-        
-        # Lấy đa thức đặc trưng từ hàng đầu của khối
-        poly_coeffs = np.concatenate(([1.0], -block[0, :]))
-        eigenvalues_block = np.roots(poly_coeffs)
-        all_eigenvalues.extend(eigenvalues_block)
-        
-        # Di chuyển đến khối tiếp theo
-        end_idx = start_idx
-        i = start_idx - 1
-
-    return sorted(all_eigenvalues, key=lambda x: (x.real, x.imag))
-
-
-#-------------------------------------------------------------------------------
-# Các ma trận để kiểm thử (giữ nguyên)
-#-------------------------------------------------------------------------------
-
-A1 = np.array([[0, 7, 6], [1, 0, 0], [0, 1, 0]])
-A2 = np.array([[6, -2, -2], [-2, 5,  0], [-2,  0,  7]])
-A3 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-A4 = np.array([[3, 0, 0], [0, 1, 2], [0, -2, 1]])
-
-test_cases = {
-    "Case 1 (Lý tưởng - Ma trận Frobenius)": A1,
-    "Case 2 (Tốt - Ma trận đối xứng)": A2,
-    "Case 3 (Xấu - Ma trận suy biến của bạn)": A3,
-    "Case 4 (Tổng quát - GTR phức)": A4,
-}
-
-#-------------------------------------------------------------------------------
-# Chạy kiểm thử và in kết quả (giữ nguyên)
-#-------------------------------------------------------------------------------
-
-print("="*60)
-print("BẮT ĐẦU KIỂM THỬ THUẬT TOÁN DANILEVSKY (PHIÊN BẢN CUỐI CÙNG)")
-print("="*60)
-
-for name, A in test_cases.items():
-    print(f"\n--- {name} ---")
-    print("Ma trận đầu vào A:")
-    print(A)
-
-    numpy_eigvals = sorted(np.linalg.eigvals(A), key=lambda x: (x.real, x.imag))
-    danilevsky_eigvals = danilevsky_algorithm(A)
-
-    print("\nKết quả so sánh giá trị riêng:")
-    print(f"{'NumPy (Chuẩn)':<25} | {'Danilevsky (Của bạn)':<25}")
-    print("-"*60)
-    
-    if len(danilevsky_eigvals) != len(numpy_eigvals):
-         print(f"Lỗi: Danilevsky trả về {len(danilevsky_eigvals)} giá trị thay vì {len(numpy_eigvals)}")
+        print(f"Trạng thái: THÀNH CÔNG")
+        print(f"Hệ số co K ≈ {contraction_factor:.4f} (K < 1 là điều kiện tốt).")
+        print(f"Hội tụ sau {iterations} vòng lặp.")
+        print(f"Nghiệm tìm được X ≈ {solution_np}")
+    elif result and not result.get("success"):
+        print(f"Trạng thái: THẤT BẠI")
+        print(f"Lỗi: {result.get('error', 'Không có thông tin lỗi.')}")
     else:
-        for i in range(len(numpy_eigvals)):
-            np_val = numpy_eigvals[i]
-            dn_val = danilevsky_eigvals[i]
-            np_str = f"{np_val.real:.4f}{np_val.imag:+.4f}j" if abs(np_val.imag) > 1e-9 else f"{np_val.real:.4f}"
-            dn_str = f"{dn_val.real:.4f}{dn_val.imag:+.4f}j" if abs(dn_val.imag) > 1e-9 else f"{dn_val.real:.4f}"
-            print(f"{np_str:<25} | {dn_str:<25}")
+        print("Trạng thái: LỖI - Thuật toán không trả về kết quả.")
+    print("=" * (44 + len(method_name)))
 
-    print("-"*60)
+
+# --- Bắt đầu kiểm thử ---
+print("--- Đang kiểm thử phương pháp Lặp đơn với bài toán hội tụ ---")
+try:
+    simple_iter_result = solve_simple_iteration_system(
+        n=2,
+        expr_list=expressions_phi_convergent,
+        x0_list=initial_guess,
+        a0_list=domain_a,
+        b0_list=domain_b,
+        stop_option=stop_mode,
+        stop_value=tolerance
+    )
+    print_results("Lặp đơn (Hội tụ)", simple_iter_result)
+except Exception as e:
+    import traceback
+    print(f"Đã xảy ra lỗi khi chạy Lặp đơn: {e}\n{traceback.format_exc()}")
