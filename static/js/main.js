@@ -781,21 +781,12 @@ function displaySvdResults(result) {
     const uCols = result.U && result.U[0] ? result.U[0].length : 0;
     const sigmaCols = result.Sigma && result.Sigma[0] ? result.Sigma[0].length : 0;
     const vtCols = result.V_transpose && result.V_transpose[0] ? result.V_transpose[0].length : 0;
-    const isWide = uCols > 4 || sigmaCols > 4 || vtCols > 4;
-    if (isWide) {
-        html += `<div class="mb-8">
-            <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
-            <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
-            <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
-        </div>`;
-    } else {
-        html += `
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 text-center">
-                <div><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
-                <div><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
-                <div><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
-            </div>`;
-    }
+    
+    html += `<div class="mb-8">
+        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
+        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
+        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
+    </div>`;
     if (result.intermediate_steps) {
         html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3><div class="space-y-6">`;
         if (result.intermediate_steps.A_transpose_A) {
