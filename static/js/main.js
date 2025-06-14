@@ -1230,7 +1230,15 @@ function displayIterativeHptResults(result, method) {
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Sai số ||Xₖ - Xₖ₋₁||∞</th>
                     </tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
                 step.table.forEach(row => {
-                    const x_k_formatted = `[${row.x_k.map(v => formatNumber(v)).join(', ')}]`;
+                    let x_k_formatted;
+                    // Kiểm tra xem row.x_k là mảng 1D (vector) hay 2D (ma trận)
+                    if (Array.isArray(row.x_k[0])) {
+                        // Nếu là ma trận, dùng formatMatrix để hiển thị
+                        x_k_formatted = formatMatrix(row.x_k);
+                    } else {
+                        // Nếu là vector, dùng logic cũ
+                        x_k_formatted = `[${row.x_k.map(v => formatNumber(v)).join(', ')}]`;
+                    }
                     html += `<tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${row.k}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${x_k_formatted}</td>

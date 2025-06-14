@@ -49,7 +49,7 @@ def solve_jacobi(matrix_a, matrix_b, x0, eps=1e-5, max_iter=100):
             
             table_rows.append({
                 "k": i + 1,
-                "x_k": [val for val in x_k_plus_1.flatten()],
+                "x_k": x_k_plus_1.tolist(),
                 "error": error
             })
 
