@@ -231,6 +231,8 @@ async function handleCalculation(endpoint, body) {
             'lu-decomposition': wrapDisplay(displayLuResults),
             'cholesky': wrapDisplay(displayCholeskyResults),
             'danilevsky': wrapDisplay(displayDanilevskyResults),
+            'power-single': wrapDisplay(displayEigenPowerResults),
+            'power-deflation': wrapDisplay(displayEigenPowerResults),
             'solve': wrapDisplay(displayNonlinearEquationResults), 
             'lu': wrapDisplay(displayInverseResults), 
             'bordering': wrapDisplay(displayInverseResults),
@@ -241,9 +243,11 @@ async function handleCalculation(endpoint, body) {
         };
         
         let key = endpoint.split('/').pop();
-        
-        if (endpoint === '/polynomial/solve') {
-             key = 'polynomial/solve';
+
+        if (endpoint.includes('/matrix/eigen/')) {
+            key = endpoint.split('/').pop();
+        } else if (endpoint === '/polynomial/solve') {
+            key = 'polynomial/solve';
         } else if (endpoint === '/nonlinear-system/solve') {
             key = 'nonlinear-system/solve';
         } else if (endpoint.includes('/matrix/inverse/')) {
@@ -306,10 +310,10 @@ function renderPage(page) {
         pageHtml = document.getElementById('matrix-svd-page').innerHTML;
         setupFunction = setupMatrixSvdEvents;
         title = 'Phân Rã Giá Trị Suy Biến (SVD)';
-    } else if (page === 'matrix-danilevsky') {
-        pageHtml = document.getElementById('matrix-danilevsky-page').innerHTML;
-        setupFunction = setupMatrixDanilevskyEvents;
-        title = 'Tìm Trị Riêng & Vector Riêng';
+    } else if (page === 'matrix-eigen-methods') {
+        pageHtml = document.getElementById('matrix-eigen-methods-page').innerHTML;
+        pageTitle.textContent = 'Tìm Giá Trị Riêng';
+        setupFunction = setupMatrixEigenMethodsEvents;
     } else if (page === 'nonlinear-solve') {
         pageHtml = document.getElementById('nonlinear-solve-page').innerHTML;
         setupFunction = setupNonlinearSolveEvents;
@@ -500,16 +504,148 @@ function setupMatrixSvdEvents() {
     };
 }
 // Hàm setup lại event cho trang Danilevsky
-function setupMatrixDanilevskyEvents() {
-    const matrixA_Input = document.getElementById('matrix-a-input-danilevsky');
+function setupMatrixEigenMethodsEvents() {
+    const tabs = document.querySelectorAll('.eigen-tab');
+    const tabContents = document.querySelectorAll('.eigen-tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(item => {
+                item.classList.remove('text-blue-600', 'border-blue-500');
+                item.classList.add('text-gray-500', 'border-transparent', 'hover:text-gray-700', 'hover:border-gray-300');
+            });
+            tab.classList.add('text-blue-600', 'border-blue-500');
+            tab.classList.remove('text-gray-500', 'border-transparent');
+
+            const targetContentId = `eigen-${tab.dataset.tab}-content`;
+            tabContents.forEach(content => {
+                content.style.display = content.id === targetContentId ? 'block' : 'none';
+            });
+            document.getElementById('results-area').innerHTML = '';
+        });
+    });
+
+    // --- Gắn sự kiện cho từng nút tính toán (ĐÃ SỬA) ---
+
+    // 1. Danilevsky
     document.getElementById('calculate-danilevsky-btn').onclick = () => {
-        const matrixA = parseMatrix(matrixA_Input.value);
-        if (matrixA.error || matrixA.length === 0) {
-            displayError(matrixA.error || 'Ma trận A không được để trống.');
+        const matrixStr = document.getElementById('matrix-a-input-danilevsky').value;
+        const matrixA = parseMatrix(matrixStr);
+        if (matrixA.error) {
+            displayError(matrixA.error);
             return;
         }
+        // Sửa ở đây: Chỉ 2 tham số
         handleCalculation('/matrix/danilevsky', { matrix_a: matrixA });
     };
+
+    // 2. Power Method (Single)
+    document.getElementById('calculate-power-method-single-btn').onclick = () => {
+        const matrixStr = document.getElementById('matrix-a-input-power-single').value;
+        const matrixA = parseMatrix(matrixStr);
+        if (matrixA.error) {
+            displayError(matrixA.error);
+            return;
+        }
+        const tolerance = document.getElementById('power-single-tolerance').value;
+        const max_iter = document.getElementById('power-single-max-iter').value;
+        const body = { matrix_a: matrixA, tolerance: tolerance, max_iter: max_iter };
+        // Sửa ở đây: Chỉ 2 tham số
+        handleCalculation('/matrix/eigen/power-single', body);
+    };
+
+    // 3. Power Method & Deflation
+    document.getElementById('calculate-power-method-deflation-btn').onclick = () => {
+        const matrixStr = document.getElementById('matrix-a-input-power-deflation').value;
+        const matrixA = parseMatrix(matrixStr);
+        if (matrixA.error) {
+            displayError(matrixA.error);
+            return;
+        }
+        const num_eigen = document.getElementById('power-deflation-num-eigen').value;
+        const tolerance = document.getElementById('power-deflation-tolerance').value;
+        const max_iter = document.getElementById('power-deflation-max-iter').value;
+        const body = { matrix_a: matrixA, num_eigen: num_eigen, tolerance: tolerance, max_iter: max_iter };
+        // Sửa ở đây: Chỉ 2 tham số
+        handleCalculation('/matrix/eigen/power-deflation', body);
+    };
+}
+
+// Hàm hiển thị kết quả cho 2 phương pháp Lũy thừa
+function displayEigenPowerResults(result) {
+    const resultsArea = document.getElementById('results-area');
+    let html = ``;
+
+    if (result.success) {
+        // Hiển thị thông báo chung (ví dụ: "Tìm thấy 3 giá trị riêng...")
+        html += `<h3 class="text-xl font-bold text-gray-800 mb-4">${result.message}</h3>`;
+
+        // Box chứa kết quả cuối cùng
+        html += `<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">`;
+        html += `<h4 class="font-semibold text-lg text-blue-800 mb-2">Kết quả cuối cùng:</h4>`;
+        
+        // Lặp qua từng cặp giá trị riêng, vector riêng tìm được
+        result.eigenvalues.forEach((lambda, i) => {
+            html += `<div class="mb-3">
+                <p><strong>Giá trị riêng ${i + 1}:</strong> <code class="font-mono text-blue-700 bg-blue-100 p-1 rounded">${formatNumber(lambda)}</code></p>
+                <p><strong>Vector riêng tương ứng ${i + 1}:</strong></p>
+                ${formatMatrix([result.eigenvectors[i]], 'v', 'vector-style')}
+            </div>`;
+        });
+        html += `</div>`;
+
+        // Khu vực hiển thị các bước trung gian
+        html += `<h3 class="text-xl font-bold text-gray-800 my-4">Các bước tính toán chi tiết</h3>`;
+        
+        // Lặp qua các bước lớn (mỗi bước tìm một giá trị riêng)
+        result.steps.forEach(step => {
+            html += `<details class="bg-gray-50 border rounded-lg mb-4">
+                        <summary class="p-4 cursor-pointer font-semibold text-gray-700">
+                            Tìm giá trị riêng thứ ${step.eigenvalue_index} (λ ≈ ${formatNumber(step.iteration_summary.found_eigenvalue)})
+                        </summary>
+                        <div class="p-4 border-t">`;
+            
+            // Nếu đây không phải GTR đầu tiên, hiển thị ma trận đã xuống thang
+            if (step.eigenvalue_index > 1) {
+                html += `<h5 class="font-semibold mb-2">Ma trận sau khi xuống thang (A<sub>${step.eigenvalue_index - 1}</sub>):</h5>`;
+                html += formatMatrix(step.matrix_before_deflation, 'A');
+            }
+
+            // Bảng chi tiết quá trình lặp
+            html += `<h5 class="font-semibold my-3">Quá trình lặp:</h5>`;
+            html += `<div class="overflow-x-auto max-h-96">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-600">x<sub>k</sub> (vector lặp)</th>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-600">A·x<sub>k</sub></th>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-600">λ<sub>k</sub> (ước lượng GTR)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">`;
+
+            // Lặp qua từng vòng lặp nhỏ trong một bước lớn
+            step.iteration_details.forEach(iter => {
+                html += `<tr>
+                            <td class="px-4 py-2 font-mono">${iter.k}</td>
+                            <td class="px-4 py-2 font-mono">[${iter.x_k.map(formatNumber).join(', ')}]</td>
+                            <td class="px-4 py-2 font-mono">[${iter.Ax_k.map(formatNumber).join(', ')}]</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(iter.lambda_k)}</td>
+                         </tr>`;
+            });
+            html += `       </tbody>
+                        </table>
+                      </div>`; // end overflow-x-auto
+            html += `</div></details>`;
+        });
+    } else {
+        // Nếu có lỗi, hiển thị thông báo lỗi
+        showError(result.error);
+    }
+
+    // Đưa toàn bộ HTML đã tạo vào trang web
+    resultsArea.innerHTML = html;
 }
 
 // ===============================================

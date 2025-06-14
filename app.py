@@ -37,6 +37,9 @@ from numerical_methods.linear_algebra.iterative_methods.gauss_seidel import solv
 
 from numerical_methods.root_finding.polynomial_root_finding import solve_polynomial
 
+from numerical_methods.linear_algebra.eigen.power_method import power_iteration_deflation
+
+
 
 app = Flask(__name__)
 CORS(app)
@@ -315,6 +318,38 @@ def handle_polynomial_solve():
     except Exception as e:
         import traceback
         print("Lỗi khi xử lý request giải đa thức:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+
+@app.route('/matrix/eigen/power-single', methods=['POST'])
+def handle_power_single():
+    data = request.get_json()
+    try:
+        matrix_a = np.array(data['matrix_a'], dtype=float)
+        tolerance = float(data.get('tolerance', 1e-6))
+        max_iter = int(data.get('max_iter', 100))
+        
+        # Gọi hàm với num_values=1 để chỉ tìm 1 GTR
+        result = power_iteration_deflation(matrix_a, num_values=1, tol=tolerance, max_iter=max_iter)
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý PP Lũy thừa (đơn):", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+# END: ENDPOINT MỚI
+
+# START: ENDPOINT MỚI CHO PP LŨY THỪA & XUỐNG THANG (NHIỀU GTR)
+@app.route('/matrix/eigen/power-deflation', methods=['POST'])
+def handle_power_deflation():
+    data = request.get_json()
+    try:
+        matrix_a = np.array(data['matrix_a'], dtype=float)
+        num_eigen = int(data.get('num_eigen', 1))
+        tolerance = float(data.get('tolerance', 1e-6))
+        max_iter = int(data.get('max_iter', 100))
+        
+        result = power_iteration_deflation(matrix_a, num_values=num_eigen, tol=tolerance, max_iter=max_iter)
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý PP Lũy thừa & Xuống thang:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
 if __name__ == '__main__':

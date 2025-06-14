@@ -29,7 +29,7 @@
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-direct">Tính ma trận nghịch đảo</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-iterative">PP Lặp - Tính ma trận nghịch đảo</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Phân tích SVD</button></li>
-                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-danilevsky">Tìm giá trị riêng</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-eigen-methods">Tìm giá trị riêng</button></li>
                     </ul>
                 </li>
                 <li>
@@ -188,14 +188,77 @@ sidebarToggle.addEventListener('click', () => {
     <div id="results-area"></div>
 </div>
 
-<div id="matrix-danilevsky-page" class="hidden">
-    <div class="mb-6">
-        <label for="matrix-a-input-danilevsky" class="block text-sm font-medium text-gray-700">Ma trận A</label>
-        <textarea id="matrix-a-input-danilevsky" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+<div id="matrix-eigen-methods-page" class="hidden">
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <button data-tab="danilevsky" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">
+                PP. Danilevsky
+            </button>
+            <button data-tab="power-single" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">
+                PP. Lũy thừa (1 GTR)
+            </button>
+            <button data-tab="power-deflation" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">
+                PP. Lũy thừa & Xuống thang
+            </button>
+        </nav>
     </div>
-    <div class="mb-6">
-        <button id="calculate-danilevsky-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Danielevsky</button>
+
+    <div>
+        <div id="eigen-danilevsky-content" class="eigen-tab-content">
+            <div class="mb-6">
+                <label for="matrix-a-input-danilevsky" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-danilevsky" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-danilevsky-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Tính bằng Danilevsky</button>
+            </div>
+        </div>
+
+        <div id="eigen-power-single-content" class="eigen-tab-content hidden">
+             <div class="mb-6">
+                <label for="matrix-a-input-power-single" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-power-single" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="6 5 -5&#10;2 6 -2&#10;2 5 -1"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="power-single-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                    <input id="power-single-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.00001">
+                </div>
+                <div>
+                    <label for="power-single-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                    <input id="power-single-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+                </div>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-power-method-single-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Tìm giá trị riêng trội</button>
+            </div>
+        </div>
+
+        <div id="eigen-power-deflation-content" class="eigen-tab-content hidden">
+             <div class="mb-6">
+                <label for="matrix-a-input-power-deflation" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-power-deflation" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="4 1 -1&#10;2 5 -2&#10;1 1 2"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="power-deflation-num-eigen" class="block text-sm font-medium text-gray-700">Số GTR cần tìm</label>
+                    <input id="power-deflation-num-eigen" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="3" min="1">
+                </div>
+                <div>
+                    <label for="power-deflation-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                    <input id="power-deflation-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.00001">
+                </div>
+                <div>
+                    <label for="power-deflation-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                    <input id="power-deflation-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+                </div>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-power-method-deflation-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tính các giá trị riêng</button>
+            </div>
+        </div>
     </div>
+
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
     <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
     <div id="results-area"></div>
