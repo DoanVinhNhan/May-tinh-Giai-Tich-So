@@ -129,21 +129,59 @@ function parseMatrix(matrixString) {
 
 function formatNumber(num, precision = displayPrecision) {
     if (num === null || num === undefined) return 'N/A';
-    // Số nhỏ hơn zeroTolerance coi là 0
+
+    // Case 1: The number is already in the correct object format {re, im}
     if (typeof num === 'object' && num !== null && num.hasOwnProperty('re') && num.hasOwnProperty('im')) {
         let realPart = num.re;
         let imagPart = num.im;
         if (Math.abs(realPart) < zeroTolerance) realPart = 0;
         if (Math.abs(imagPart) < zeroTolerance) imagPart = 0;
+
         if (imagPart === 0) return realPart.toFixed(precision);
         
         const sign = imagPart < 0 ? ' - ' : ' + ';
         return `${realPart.toFixed(precision)}${sign}${Math.abs(imagPart).toFixed(precision)}i`;
     }
+
+    // Case 2: The number is a standard JavaScript number (real)
     if (typeof num === 'number') {
         if (Math.abs(num) < zeroTolerance) return (0).toFixed(precision);
         return num.toFixed(precision);
     }
+
+    // Case 3 (IMPROVED): The number is a pre-formatted string from the backend (e.g., "0.5+0.86j" or "1.2e-5-3.4e-6j")
+    if (typeof num === 'string' && num.endsWith('j')) {
+        let splitPos = -1;
+        // Find the separator (+ or -) by iterating from the end.
+        // This is more robust than lastIndexOf because it can ignore signs in scientific notation (e.g., "e-5").
+        for (let i = num.length - 2; i > 0; i--) {
+            if (num[i] === '+' || num[i] === '-') {
+                if (num[i-1].toLowerCase() !== 'e') {
+                    splitPos = i;
+                    break; 
+                }
+            }
+        }
+
+        if (splitPos !== -1) {
+            const realStr = num.substring(0, splitPos);
+            const imagStr = num.substring(splitPos, num.length - 1); // remove 'j'
+            
+            const realPart = parseFloat(realStr);
+            const imagPart = parseFloat(imagStr);
+
+            if (!isNaN(realPart) && !isNaN(imagPart)) {
+                // Successfully parsed, now format it correctly
+                if (Math.abs(imagPart) < zeroTolerance) {
+                     return realPart.toFixed(precision);
+                }
+                const sign = imagPart < 0 ? ' - ' : ' + ';
+                return `${realPart.toFixed(precision)}${sign}${Math.abs(imagPart).toFixed(precision)}i`;
+            }
+        }
+    }
+
+    // Fallback: return the number/string as is if it doesn't match any case
     return num;
 }
 
@@ -1060,32 +1098,55 @@ function displayCholeskyResults(result) {
 function displayDanilevskyResults(result) {
     const resultsArea = document.getElementById('results-area');
     let html = `<h3 class="result-heading">Kết Quả Tìm Giá Trị Riêng (Danielevsky)</h3>`;
-    
-    // Kiểm tra kết quả có đúng định dạng không
+
     if (result.eigenvalues && result.eigenvectors) {
-         html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Giá trị riêng (λ):</h4><div class="matrix-display text-center">[${result.eigenvalues.map(v => formatNumber(v)).join(',&nbsp;&nbsp; ')}]</div></div>`;
-        
-        // Cần chỉnh sửa cách hiển thị vector riêng cho phù hợp
-        let eigenvectorsHtml = '<table class="matrix-table">';
-        const num_vectors = result.eigenvectors.length > 0 ? result.eigenvectors[0].length : 0;
-        if(num_vectors > 0) {
-            const num_components = result.eigenvectors.length;
-            for (let i = 0; i < num_components; i++) {
-                eigenvectorsHtml += '<tr>';
-                for(let j=0; j<num_vectors; j++){
-                     eigenvectorsHtml += `<td>${formatNumber(result.eigenvectors[i][j])}</td>`;
+        // Định dạng và hiển thị các giá trị riêng
+        const formattedEigenvalues = result.eigenvalues.map(v => formatNumber(v, displayPrecision)).join(',&nbsp;&nbsp; ');
+        html += `<div class="mb-8">
+                     <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Giá trị riêng (λ):</h4>
+                     <div class="matrix-display text-center">[${formattedEigenvalues}]</div>
+                 </div>`;
+
+        // --- BẮT ĐẦU LOGIC CHUYỂN ĐỔI QUAN TRỌNG ---
+        // Backend trả về một danh sách các vector cột (mảng 3D).
+        // Chúng ta cần chuyển nó thành một ma trận 2D chuẩn để hiển thị.
+        const eigenvectorsFromBackend = result.eigenvectors;
+        let matrixToDisplay = [];
+
+        if (eigenvectorsFromBackend && eigenvectorsFromBackend.length > 0 && eigenvectorsFromBackend[0].length > 0) {
+            const numRows = eigenvectorsFromBackend[0].length;
+            const numCols = eigenvectorsFromBackend.length;
+            
+            // Tạo một ma trận 2D rỗng
+            matrixToDisplay = Array(numRows).fill(null).map(() => Array(numCols).fill(null));
+
+            // Lặp qua dữ liệu 3D và điền vào ma trận 2D
+            for (let col = 0; col < numCols; col++) { // col tương ứng với mỗi vector riêng
+                for (let row = 0; row < numRows; row++) { // row tương ứng với mỗi thành phần của vector
+                    // Lấy giá trị từ cấu trúc lồng nhau [vector][thành phần][giá trị]
+                    if (eigenvectorsFromBackend[col] && eigenvectorsFromBackend[col][row] && eigenvectorsFromBackend[col][row][0] !== undefined) {
+                        matrixToDisplay[row][col] = eigenvectorsFromBackend[col][row][0];
+                    }
                 }
-                eigenvectorsHtml += '</tr>';
             }
         }
-        eigenvectorsHtml += '</table>';
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Vector riêng tương ứng (các cột):</h4><div class="matrix-display">${formatMatrix(result.eigenvectors)}</div></div>`;
+        // --- KẾT THÚC LOGIC CHUYỂN ĐỔI ---
+
+        // Bây giờ, gọi formatMatrix với ma trận 2D đã được chuyển đổi
+        const formattedEigenvectors = formatMatrix(matrixToDisplay, displayPrecision);
+        html += `<div class="mb-8">
+                     <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Vector riêng tương ứng (các cột):</h4>
+                     <div class="matrix-display">${formattedEigenvectors}</div>
+                 </div>`;
 
 
         if (result.steps && result.steps.length > 0) {
             html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
             result.steps.forEach((step, i) => {
-                html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.desc || `Bước ${i+1}`}</h4><div class="matrix-display">${formatMatrix(step.matrix)}</div></div>`;
+                html += `<div>
+                             <h4 class="font-medium text-gray-700 mb-2">${step.desc || `Bước ${i+1}`}</h4>
+                             <div class="matrix-display">${formatMatrix(step.matrix, displayPrecision)}</div>
+                         </div>`;
             });
             html += `</div></div>`;
         }

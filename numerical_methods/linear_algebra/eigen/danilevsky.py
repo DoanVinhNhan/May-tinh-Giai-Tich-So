@@ -38,9 +38,6 @@ def danilevsky_algorithm(A):
 
     # --- Giai đoạn 1: Biến đổi ma trận về dạng tam giác trên theo khối Frobenius ---
     for k in range(n - 1, 0, -1):
-        step_desc = f'Bắt đầu xử lý hàng {k+1}'
-        steps_log.append({'desc': step_desc, 'matrix': format_matrix_for_json(similar.copy())})
-
         if abs(similar[k, k - 1]) < 1e-9:
             swap_col_j = -1
             for j in range(k - 2, -1, -1):
