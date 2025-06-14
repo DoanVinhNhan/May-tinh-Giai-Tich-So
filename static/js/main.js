@@ -615,9 +615,20 @@ function displayEigenPowerResults(result) {
     let html = ``;
 
     if (result.success) {
+
         // Hiển thị thông báo chung (ví dụ: "Tìm thấy 3 giá trị riêng...")
         html += `<h3 class="text-xl font-bold text-gray-800 mb-4">${result.message}</h3>`;
 
+        if (result.warnings && result.warnings.length > 0) {
+            result.warnings.forEach(warning => {
+                // Xây dựng chuỗi HTML cho thẻ div cảnh báo, không phải tạo đối tượng
+                html += `
+                    <div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">
+                        <i class="fa-solid fa-triangle-exclamation mr-2"></i>${warning}
+                    </div>
+                `;
+            });
+        }
         // Box chứa kết quả cuối cùng
         html += `<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">`;
         html += `<h4 class="font-semibold text-lg text-blue-800 mb-2">Kết quả cuối cùng:</h4>`;

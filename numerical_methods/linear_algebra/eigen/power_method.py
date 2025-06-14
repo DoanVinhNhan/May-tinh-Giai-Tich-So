@@ -19,6 +19,7 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
         eigenvalues = []
         eigenvectors = []
         all_steps = []
+        warnings = [] # Khởi tạo danh sách cảnh báo
 
         for s in range(num_values):
             # --- Power Iteration để tìm GTR trội của A_current ---
@@ -52,7 +53,8 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
                 lambda_prev = lambda_curr
                 x = x_new
             else: # Nếu vòng lặp kết thúc mà không break (không hội tụ)
-                pass # Có thể thêm cảnh báo ở đây nếu muốn
+                # THÊM CẢNH BÁO KHI VƯỢT QUÁ SỐ LẦN LẶP
+                warnings.append(f"Cảnh báo: Phép lặp cho giá trị riêng thứ {s + 1} không hội tụ sau {max_iter} lần lặp. Kết quả có thể không chính xác.")
 
             eigenvalues.append(lambda_curr)
             eigenvectors.append(x.flatten().tolist())
@@ -81,7 +83,8 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
             "message": message,
             "eigenvalues": eigenvalues,
             "eigenvectors": eigenvectors,
-            "steps": all_steps
+            "steps": all_steps,
+            "warnings": warnings # Trả về danh sách cảnh báo
         }
 
     except np.linalg.LinAlgError as e:
