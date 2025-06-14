@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderPage(btn.getAttribute('data-page'));
         });
     });
+    setupDisplaySettingsEvents();
 });
 
 // === DOM ELEMENTS ===
@@ -14,8 +15,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // === GLOBAL STATE ===
 let displayPrecision = 4; // Số chữ số sau dấu phẩy mặc định
-
+let zeroTolerance = 1e-15;
 // === HELPER FUNCTIONS ===
+
+function setupDisplaySettingsEvents() {
+    const precisionInput = document.getElementById('setting-precision');
+    const toleranceInput = document.getElementById('setting-zero-tolerance');
+
+    if (!precisionInput || !toleranceInput) {
+        console.warn("Không tìm thấy các ô input cài đặt hiển thị.");
+        return;
+    };
+
+    // Xử lý thay đổi số chữ số
+    precisionInput.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        if (!isNaN(val) && val >= 0 && val <= 15) {
+            displayPrecision = val;
+            // Nếu có kết quả cũ, render lại với định dạng mới
+            if (window.lastResult && typeof window.lastDisplayFn === 'function') {
+                const currentMethod = window.lastResult.method_used_for_display;
+                window.lastDisplayFn(window.lastResult, currentMethod);
+            }
+        }
+    });
+
+    // Xử lý thay đổi ngưỡng làm tròn về 0
+    toleranceInput.addEventListener('input', (e) => {
+        const valStr = e.target.value;
+        // Cho phép các định dạng khoa học như "1e-15"
+        if (/^-?\d*(\.\d+)?(e-?\d+)?$/i.test(valStr)) {
+            const val = parseFloat(valStr);
+            if (!isNaN(val) && val >= 0) {
+                zeroTolerance = val;
+                // Nếu có kết quả cũ, render lại với định dạng mới
+                if (window.lastResult && typeof window.lastDisplayFn === 'function') {
+                    const currentMethod = window.lastResult.method_used_for_display;
+                    window.lastDisplayFn(window.lastResult, currentMethod);
+                }
+            }
+        }
+    });
+}
+
     // --- Hàm chuyển đổi LaTeX sang Python ---
 function latexToPython(latex) {
     if (!latex) return "";
@@ -87,19 +129,19 @@ function parseMatrix(matrixString) {
 
 function formatNumber(num, precision = displayPrecision) {
     if (num === null || num === undefined) return 'N/A';
-    // Số nhỏ hơn 1e-15 coi là 0
+    // Số nhỏ hơn zeroTolerance coi là 0
     if (typeof num === 'object' && num !== null && num.hasOwnProperty('re') && num.hasOwnProperty('im')) {
         let realPart = num.re;
         let imagPart = num.im;
-        if (Math.abs(realPart) < 1e-15) realPart = 0;
-        if (Math.abs(imagPart) < 1e-15) imagPart = 0;
+        if (Math.abs(realPart) < zeroTolerance) realPart = 0;
+        if (Math.abs(imagPart) < zeroTolerance) imagPart = 0;
         if (imagPart === 0) return realPart.toFixed(precision);
         
         const sign = imagPart < 0 ? ' - ' : ' + ';
         return `${realPart.toFixed(precision)}${sign}${Math.abs(imagPart).toFixed(precision)}i`;
     }
     if (typeof num === 'number') {
-        if (Math.abs(num) < 1e-15) return (0).toFixed(precision);
+        if (Math.abs(num) < zeroTolerance) return (0).toFixed(precision);
         return num.toFixed(precision);
     }
     return num;
@@ -581,7 +623,7 @@ function displayNonlinearEquationResults(result) {
     let html = `
         <h3 class="result-heading">Kết Quả Giải Phương Trình</h3>
         <div class="text-center font-medium text-lg mb-6 p-4 bg-green-50 rounded-lg shadow-inner">
-            Nghiệm x ≈ <span class="font-bold text-green-700">${formatNumber(result.solution, 8)}</span>
+            Nghiệm x ≈ <span class="font-bold text-green-700">${formatNumber(result.solution)}</span>
         </div>
         <div class="mb-4 text-center text-gray-600">
             Số lần lặp: ${result.iterations}
@@ -620,7 +662,7 @@ function displayNonlinearEquationResults(result) {
         result.steps.forEach(step => {
             html += `<tr>`;
             headers.forEach(header => {
-                html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(step[header], 6)}</td>`;
+                html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(step[header])}</td>`;
             });
             html += `</tr>`;
         });
@@ -1080,7 +1122,7 @@ function displayNonlinearSystemResults(result) {
     // Hiển thị nghiệm
     if (result.solution) {
         const solMatrix = result.solution.map(v => [v]);
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X ≈</h4><div class="matrix-display">${formatMatrix(solMatrix, 6)}</div></div>`;
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X ≈</h4><div class="matrix-display">${formatMatrix(solMatrix)}</div></div>`;
     }
 
     // Hiển thị các thông tin chẩn đoán
@@ -1123,7 +1165,7 @@ function displayNonlinearSystemResults(result) {
             // Vòng lặp đúng: duyệt qua tất cả headers
             headers.forEach(header => {
                  const value = step[header];
-                 html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(value, 6)}</td>`;
+                 html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(value)}</td>`;
             });
             html += `</tr>`;
         });
@@ -1161,7 +1203,7 @@ function displayIterativeHptResults(result, method) {
     }
 
     if (result.solution) {
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution, 6)}</div></div>`;
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
     }
 
     if (result.steps && result.steps.length > 0) {
@@ -1176,11 +1218,11 @@ function displayIterativeHptResults(result, method) {
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Sai số ||Xₖ - Xₖ₋₁||∞</th>
                     </tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
                 step.table.forEach(row => {
-                    const x_k_formatted = `[${row.x_k.map(v => formatNumber(v, 6)).join(', ')}]`;
+                    const x_k_formatted = `[${row.x_k.map(v => formatNumber(v)).join(', ')}]`;
                     html += `<tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${row.k}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${x_k_formatted}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(row.error, 8)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(row.error)}</td>
                     </tr>`;
                 });
                 html += `</tbody></table></div></div>`;
@@ -1297,7 +1339,7 @@ function displayPolynomialResults(result) {
         html += `<div class="space-y-6">`;
         result.found_roots.forEach((root_info, index) => {
             html += `<div class="p-4 border border-purple-200 rounded-lg">
-                        <p class="font-semibold text-purple-800 text-xl">Nghiệm ${index + 1} ≈ <span class="font-mono">${formatNumber(root_info.root_value, 8)}</span></p>
+                        <p class="font-semibold text-purple-800 text-xl">Nghiệm ${index + 1} ≈ <span class="font-mono">${formatNumber(root_info.root_value)}</span></p>
                         <p class="text-sm text-gray-500">Tìm thấy trong khoảng [${formatNumber(root_info.interval[0])}, ${formatNumber(root_info.interval[1])}]</p>
                         
                         <details class="mt-3">
@@ -1315,10 +1357,10 @@ function displayPolynomialResults(result) {
             root_info.bisection_steps.forEach(step => {
                 html += `<tr>
                             <td class="px-4 py-2 font-mono">${step.k}</td>
-                            <td class="px-4 py-2 font-mono">${formatNumber(step.a, 6)}</td>
-                            <td class="px-4 py-2 font-mono">${formatNumber(step.b, 6)}</td>
-                            <td class="px-4 py-2 font-mono text-purple-700 font-semibold">${formatNumber(step.c, 6)}</td>
-                            <td class="px-4 py-2 font-mono">${formatNumber(step['f(c)'], 6)}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step.a)}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step.b)}</td>
+                            <td class="px-4 py-2 font-mono text-purple-700 font-semibold">${formatNumber(step.c)}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step['f(c)'])}</td>
                          </tr>`;
             });
             html += `</tbody></table></div></details></div>`;
