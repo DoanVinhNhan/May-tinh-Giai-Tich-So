@@ -77,8 +77,8 @@ Một ứng dụng web cung cấp bộ công cụ toàn diện để giải các
 2.  **(Khuyến khích) Tạo và kích hoạt môi trường ảo:**
     ```bash
     # Lệnh cho Windows
-    python -m venv venv
-    .\venv\Scripts\activate
+    python -m venv .venv
+    source .venv/bin/activate
 
     # Lệnh cho macOS/Linux
     python3 -m venv venv
