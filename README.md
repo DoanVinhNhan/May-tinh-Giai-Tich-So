@@ -102,5 +102,3 @@ Một ứng dụng web cung cấp bộ công cụ toàn diện để giải các
     Mở file `templates/index.html` trực tiếp bằng trình duyệt của bạn.
 
     > **Lưu ý:** Giao diện người dùng đã được thiết kế để giao tiếp với server backend đang chạy. Hãy đảm bảo server Flask luôn hoạt động khi bạn sử dụng ứng dụng.
-
-## Cấu trúc thư mục
