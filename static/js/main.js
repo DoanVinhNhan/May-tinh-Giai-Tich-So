@@ -1241,26 +1241,26 @@ function setupIterativeHptCalculation(endpoint) {
     handleCalculation(endpoint, body);
 }
 function setupPolynomialSolveEvents() {
-    const calculateBtn = document.getElementById('calculate-poly-btn');
-    const coeffsInput = document.getElementById('poly-coeffs-input');
+    document.getElementById('calculate-poly-btn').onclick = () => {
+        const coeffs = document.getElementById('poly-coeffs-input').value.trim().split(/\s+/).map(Number).filter(n => !isNaN(n));
+        if (coeffs.length < 2) return displayError('Vui lòng nhập ít nhất 2 hệ số.');
 
-    calculateBtn.addEventListener('click', () => {
-        const coeffsStr = coeffsInput.value.trim();
-        if (!coeffsStr) {
-            displayError('Vui lòng nhập các hệ số của đa thức.');
-            return;
+        // Lấy giá trị từ các ô nhập mới
+        const tolerance = parseFloat(document.getElementById('poly-tolerance').value);
+        const maxIter = parseInt(document.getElementById('poly-max-iter').value);
+
+        if (isNaN(tolerance) || isNaN(maxIter)) {
+            return displayError('Sai số và Số lần lặp phải là các số hợp lệ.');
         }
 
-        const coeffs = coeffsStr.split(/\s+/).map(Number).filter(n => !isNaN(n));
-        
-        if (coeffs.length < 2) {
-            displayError('Vui lòng nhập ít nhất 2 hệ số (tương ứng đa thức bậc 1).');
-            return;
-        }
-        
-        const body = { coeffs: coeffs };
+        const body = { 
+            coeffs: coeffs,
+            tolerance: tolerance,
+            max_iter: maxIter
+        };
+
         handleCalculation('/polynomial/solve', body);
-    });
+    };
 }
 
 function displayPolynomialResults(result) {

@@ -306,9 +306,14 @@ def handle_polynomial_solve():
         return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu các hệ số."}), 400
     try:
         coeffs = [float(c) for c in data['coeffs']]
-        result = solve_polynomial(coeffs)
+        # Lấy tolerance và max_iter từ request, nếu không có thì dùng giá trị mặc định
+        tolerance = data.get('tolerance', 1e-7)
+        max_iter = data.get('max_iter', 100)
+
+        result = solve_polynomial(coeffs, tol=tolerance, max_iter=max_iter)
         return jsonify(result)
     except Exception as e:
+        import traceback
         print("Lỗi khi xử lý request giải đa thức:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 

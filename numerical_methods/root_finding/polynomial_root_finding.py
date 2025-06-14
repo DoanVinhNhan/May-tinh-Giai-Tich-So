@@ -112,7 +112,7 @@ def _bisection(p, a, b, tol=1e-7, max_iter=100):
     return (a + b) / 2.0, steps
 
 
-def solve_polynomial(coeffs, tol=1e-7):
+def solve_polynomial(coeffs, tol=1e-7, max_iter=100):
     """
     Giải phương trình đa thức và trả về các bước trung gian.
     """

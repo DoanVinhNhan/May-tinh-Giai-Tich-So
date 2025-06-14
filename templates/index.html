@@ -350,11 +350,20 @@ sidebarToggle.addEventListener('click', () => {
             <p class="mt-2 text-xs text-gray-500">Ví dụ: `1 3 -11 -3 10` tương ứng với đa thức `x^4 + 3x^3 - 11x^2 - 3x + 10 = 0`</p>
         </div>
     </div>
-    
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-6 border-t pt-6">
+        <div>
+            <label for="poly-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+            <input id="poly-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.0000001">
+        </div>
+        <div>
+            <label for="poly-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa (cho mỗi nghiệm)</label>
+            <input id="poly-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+        </div>
+    </div>
     <div class="mt-8 mb-8">
         <button id="calculate-poly-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tìm Nghiệm Thực</button>
     </div>
-
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
     <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
     <div id="results-area"></div>
