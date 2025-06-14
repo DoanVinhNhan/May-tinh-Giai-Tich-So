@@ -36,7 +36,7 @@ def solve_simple_iteration_system(n, expr_list, x0_list, a0_list, b0_list, stop_
                 func_to_optimize = lambdify(variables, J[i, j], 'numpy')
                 max_val = find_global_maximum_on_box(func_to_optimize, variables, bounds)
                 if max_val == -np.inf:
-                    return {"success": False, "error": f"Không thể tìm GTLN cho ∂φ_{i+1}/∂x_{j+1}. Có thể biểu thức quá phức tạp."}
+                    return {"success": False, "error": f"Không thể tìm GTLN cho ∂φ_{i+1}/∂x_{j+1}. Có thể biểu thức không xác định trên miền D hoặc quá phức tạp"}
                 J_max_vals[i, j] = max_val
         
         # Tính hệ số co K theo chuẩn hàng và chuẩn cột
