@@ -36,6 +36,9 @@
                     <button class="w-full text-left px-3 py-2 rounded hover:bg-green-50 font-medium text-gray-800" data-page="nonlinear-solve">Giải phương trình f(x)=0</button>
                 </li>
                 <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-purple-50 font-medium text-gray-800" data-page="polynomial-solve">Giải phương trình đa thức</button>
+                </li>
+                <li>
                     <button class="w-full text-left px-3 py-2 rounded hover:bg-yellow-50 font-medium text-gray-800" data-page="nonlinear-system-solve">Giải hệ phương trình phi tuyến</button>
                 </li>
 
@@ -300,6 +303,56 @@ sidebarToggle.addEventListener('click', () => {
     
     <div class="mt-8 mb-8">
         <button id="calculate-ns-btn" class="action-btn bg-yellow-600 hover:bg-yellow-700">Giải Hệ Phi Tuyến</button>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<div id="matrix-solve-iterative-page" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+            <label for="matrix-a-input-iter" class="block text-sm font-medium text-gray-700">Ma trận A (chéo trội để đảm bảo hội tụ)</label>
+            <textarea id="matrix-a-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="10 -1 2 0&#10;-1 11 -1 3&#10;2 -1 10 -1&#10;0 3 -1 8"></textarea>
+        </div>
+        <div>
+            <label for="matrix-b-input-iter" class="block text-sm font-medium text-gray-700">Vector B</label>
+            <textarea id="matrix-b-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="6&#10;25&#10;-11&#10;15"></textarea>
+        </div>
+    </div>
+     <div class="mb-6">
+        <label for="x0-input-iter" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀ (mỗi giá trị một dòng)</label>
+        <textarea id="x0-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0&#10;0&#10;0&#10;0"></textarea>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <label for="iter-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+            <input id="iter-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.0001">
+        </div>
+        <div>
+            <label for="iter-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+            <input id="iter-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+        </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button id="calculate-jacobi-btn" class="action-btn bg-teal-600 hover:bg-teal-700">Jacobi</button>
+        <button id="calculate-gs-btn" class="action-btn bg-sky-600 hover:bg-sky-700">Gauss-Seidel</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<div id="polynomial-solve-page" class="hidden">
+    <div class="space-y-6">
+        <div>
+            <label for="poly-coeffs-input" class="block text-sm font-medium text-gray-700">Nhập các hệ số của đa thức (từ bậc cao đến thấp, cách nhau bằng dấu cách)</label>
+            <input id="poly-coeffs-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm p-2 font-mono" placeholder="1 3 -11 -3 10">
+            <p class="mt-2 text-xs text-gray-500">Ví dụ: `1 3 -11 -3 10` tương ứng với đa thức `x^4 + 3x^3 - 11x^2 - 3x + 10 = 0`</p>
+        </div>
+    </div>
+    
+    <div class="mt-8 mb-8">
+        <button id="calculate-poly-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tìm Nghiệm Thực</button>
     </div>
 
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>

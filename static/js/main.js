@@ -194,16 +194,22 @@ async function handleCalculation(endpoint, body) {
             'bordering': wrapDisplay(displayInverseResults),
             'jacobi': wrapDisplay(displayInverseResults),
             'newton': wrapDisplay(displayInverseResults),
-            'nonlinear-system/solve': wrapDisplay(displayNonlinearSystemResults)
+            'nonlinear-system/solve': wrapDisplay(displayNonlinearSystemResults),
+            'polynomial/solve': wrapDisplay(displayPolynomialResults)
         };
         
         let key = endpoint.split('/').pop();
         
-        if (endpoint === '/nonlinear-system/solve') {
+        if (endpoint === '/polynomial/solve') {
+             key = 'polynomial/solve';
+        } else if (endpoint === '/nonlinear-system/solve') {
             key = 'nonlinear-system/solve';
         } else if (endpoint.includes('/matrix/inverse/')) {
             displayMap[key](result, key);
             return; 
+        } else if (endpoint.includes('/matrix/iterative/')) {
+            displayIterativeHptResults(result, key);
+            return;
         }
         
         if (displayMap[key]) {
@@ -242,6 +248,10 @@ function renderPage(page) {
         pageHtml = document.getElementById('matrix-solve-direct-page').innerHTML;
         setupFunction = setupMatrixSolveEvents;
         title = 'Giải Hệ Phương Trình Tuyến Tính';
+    } else if (page === 'matrix-solve-iterative') { // START: THÊM LỰA CHỌN RENDER MỚI
+        pageHtml = document.getElementById('matrix-solve-iterative-page').innerHTML;
+        setupFunction = setupMatrixSolveIterativeEvents;
+        title = 'PP Lặp - Giải Hệ Phương Trình';
     } else if (page === 'matrix-inverse-direct') {
         pageHtml = document.getElementById('matrix-inverse-direct-page').innerHTML;
         setupFunction = setupMatrixInverseDirectEvents;
@@ -266,6 +276,10 @@ function renderPage(page) {
         pageHtml = document.getElementById('nonlinear-system-solve-page').innerHTML;
         setupFunction = setupNonlinearSystemSolveEvents;
         title = 'Giải Hệ Phương Trình Phi Tuyến';
+    } else if (page === 'polynomial-solve') {
+        pageHtml = document.getElementById('polynomial-solve-page').innerHTML;
+        setupFunction = setupPolynomialSolveEvents;
+        title = 'Giải Phương Trình Đa Thức';
     } else {
         pageHtml = '<div class="text-center text-gray-500">Chọn một chức năng ở menu bên trái.</div>';
     }
@@ -290,6 +304,7 @@ document.querySelectorAll('[data-page]').forEach(btn => {
             b.classList.remove('bg-blue-100', 'text-blue-700');
             b.classList.remove('bg-green-100', 'text-green-700');
             b.classList.remove('bg-yellow-100', 'text-yellow-700');
+            b.classList.remove('bg-purple-100', 'text-purple-700');
         });
         
         // BƯỚC 2: Thêm màu active cho nút vừa được click
@@ -300,6 +315,9 @@ document.querySelectorAll('[data-page]').forEach(btn => {
             button.classList.add('bg-blue-100', 'text-blue-700');
         } else if (page === 'nonlinear-solve') {
             button.classList.add('bg-green-100', 'text-green-700');
+        } else if (page === 'polynomial-solve') {
+            button.classList.add('bg-purple-100', 'text-purple-700');
+        // END: THÊM ĐỔI MÀU
         } else if (page === 'nonlinear-system-solve') {
             button.classList.add('bg-yellow-100', 'text-yellow-700');
         }
@@ -1128,6 +1146,201 @@ function displayNonlinearSystemResults(result) {
                     });
                 } catch(e) { console.error('Lỗi render KaTeX:', e); }
             });
+        }
+    }
+}
+function displayIterativeHptResults(result, method) {
+    const resultsArea = document.getElementById('results-area');
+    let html = `<h3 class="result-heading">Kết Quả Giải Hệ Bằng ${method.charAt(0).toUpperCase() + method.slice(1)}</h3>`;
+
+    if (result.message) {
+        html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-blue-50 rounded-lg shadow-inner">${result.message}</div>`;
+    }
+    if (result.warning) {
+        html += `<div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">${result.warning}</div>`;
+    }
+
+    if (result.solution) {
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution, 6)}</div></div>`;
+    }
+
+    if (result.steps && result.steps.length > 0) {
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
+        result.steps.forEach(step => {
+            if (step.table) { // Đây là bảng lặp
+                html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
+                html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50"><tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Lần lặp k</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Nghiệm X_k</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Sai số ||Xₖ - Xₖ₋₁||∞</th>
+                    </tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+                step.table.forEach(row => {
+                    const x_k_formatted = `[${row.x_k.map(v => formatNumber(v, 6)).join(', ')}]`;
+                    html += `<tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${row.k}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${x_k_formatted}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(row.error, 8)}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div></div>`;
+            } else { // Đây là các ma trận T, c
+                html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
+                if(step.T) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp T:</span><div class="matrix-display">${formatMatrix(step.T)}</div></div>`;
+                if(step.c) html += `<div class="mt-2"><span class="font-semibold">Vector c:</span><div class="matrix-display">${formatMatrix(step.c)}</div></div>`;
+                html += `</div>`;
+            }
+        });
+        html += `</div></div>`;
+    }
+    resultsArea.innerHTML = html;
+}
+function setupMatrixSolveIterativeEvents() {
+    document.getElementById('calculate-jacobi-btn').onclick = () => setupIterativeHptCalculation('/matrix/iterative/jacobi');
+    document.getElementById('calculate-gs-btn').onclick = () => setupIterativeHptCalculation('/matrix/iterative/gauss-seidel');
+}
+function setupIterativeHptCalculation(endpoint) {
+    const matrixA_Input = document.getElementById('matrix-a-input-iter');
+    const matrixB_Input = document.getElementById('matrix-b-input-iter');
+    const x0_Input = document.getElementById('x0-input-iter');
+    const tolerance_Input = document.getElementById('iter-tolerance');
+    const maxIter_Input = document.getElementById('iter-max-iter');
+
+    const matrixA = parseMatrix(matrixA_Input.value);
+    if (matrixA.error || matrixA.length === 0) {
+        displayError(matrixA.error || 'Ma trận A không được để trống.');
+        return;
+    }
+    const matrixB = parseMatrix(matrixB_Input.value);
+    if (matrixB.error || matrixB.length === 0) {
+        displayError(matrixB.error || 'Ma trận B không được để trống.');
+        return;
+    }
+    const x0 = parseMatrix(x0_Input.value);
+     if (x0.error || x0.length === 0) {
+        displayError(x0.error || 'Vector lặp ban đầu X₀ không được để trống.');
+        return;
+    }
+
+    if (matrixA.length !== matrixB.length || matrixA.length !== x0.length) {
+         displayError(`Số hàng của ma trận A (${matrixA.length}), B (${matrixB.length}) và X₀ (${x0.length}) phải bằng nhau.`);
+         return;
+    }
+     if (matrixA.length !== matrixA[0].length) {
+        displayError('Ma trận A phải là ma trận vuông.');
+        return;
+    }
+
+    const body = {
+        matrix_a: matrixA,
+        matrix_b: matrixB,
+        x0: x0,
+        tolerance: parseFloat(tolerance_Input.value),
+        max_iter: parseInt(maxIter_Input.value)
+    };
+    handleCalculation(endpoint, body);
+}
+function setupPolynomialSolveEvents() {
+    const calculateBtn = document.getElementById('calculate-poly-btn');
+    const coeffsInput = document.getElementById('poly-coeffs-input');
+
+    calculateBtn.addEventListener('click', () => {
+        const coeffsStr = coeffsInput.value.trim();
+        if (!coeffsStr) {
+            displayError('Vui lòng nhập các hệ số của đa thức.');
+            return;
+        }
+
+        const coeffs = coeffsStr.split(/\s+/).map(Number).filter(n => !isNaN(n));
+        
+        if (coeffs.length < 2) {
+            displayError('Vui lòng nhập ít nhất 2 hệ số (tương ứng đa thức bậc 1).');
+            return;
+        }
+        
+        const body = { coeffs: coeffs };
+        handleCalculation('/polynomial/solve', body);
+    });
+}
+
+function displayPolynomialResults(result) {
+    const resultsArea = document.getElementById('results-area');
+    
+    let html = `<h3 class="result-heading">Kết Quả Giải Phương Trình Đa Thức</h3>`;
+
+    // Thay đổi ở đây: Tạo một div container để render LaTeX
+    html += `<div id="polynomial-latex-container" class="text-center text-2xl mb-6 p-4 bg-purple-50 rounded-lg shadow-inner"></div>`;
+    
+    // Bước 1: Khoảng chứa nghiệm (giữ nguyên)
+    html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
+                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 1: Tìm khoảng chứa nghiệm</h4>
+                <p class="text-gray-600">Dựa trên các hệ số, tất cả các nghiệm thực (nếu có) của đa thức sẽ nằm trong khoảng:</p>
+                <p class="text-center font-bold text-xl text-purple-700 my-2">[${formatNumber(result.bounds[0])}, ${formatNumber(result.bounds[1])}]</p>
+             </div>`;
+
+    // Bước 2: Phân ly nghiệm (giữ nguyên)
+    html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
+                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 2: Phân ly nghiệm</h4>
+                <p class="text-gray-600">Tìm các điểm cực trị (nghiệm của đạo hàm) để chia khoảng lớn thành các khoảng nhỏ hơn, mỗi khoảng chứa tối đa 1 nghiệm.</p>
+                <p class="text-gray-800 mt-2">Các điểm cực trị thực tìm được: <span class="font-mono">${result.critical_points.length > 0 ? result.critical_points.map(p => formatNumber(p)).join(', ') : 'Không có'}</span></p>
+                <p class="text-gray-800 mt-2">Các khoảng sẽ được xét nghiệm: <span class="font-mono">${result.search_intervals.map(iv => `[${formatNumber(iv[0])}, ${formatNumber(iv[1])}]`).join('; ')}</span></p>
+             </div>`;
+             
+    // Bước 3: Tìm nghiệm (giữ nguyên)
+    html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
+                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 3: Tìm nghiệm trong từng khoảng</h4>`;
+
+    if (result.found_roots.length === 0) {
+        html += `<p class="text-center text-gray-500 font-medium mt-4">Không tìm thấy nghiệm thực nào trong các khoảng trên.</p>`;
+    } else {
+        html += `<p class="text-gray-600 mb-4">Sử dụng phương pháp Chia đôi (Bisection) trong các khoảng có dấu của f(x) thay đổi ở 2 biên.</p>`;
+        html += `<div class="space-y-6">`;
+        result.found_roots.forEach((root_info, index) => {
+            html += `<div class="p-4 border border-purple-200 rounded-lg">
+                        <p class="font-semibold text-purple-800 text-xl">Nghiệm ${index + 1} ≈ <span class="font-mono">${formatNumber(root_info.root_value, 8)}</span></p>
+                        <p class="text-sm text-gray-500">Tìm thấy trong khoảng [${formatNumber(root_info.interval[0])}, ${formatNumber(root_info.interval[1])}]</p>
+                        
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-sm font-medium text-purple-600 hover:text-purple-800">Xem các bước lặp (Chia đôi)</summary>
+                            <div class="overflow-x-auto mt-2">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-gray-100"><tr>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">aₖ</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">bₖ</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">cₖ = (aₖ+bₖ)/2</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">f(cₖ)</th>
+                                    </tr></thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">`;
+            root_info.bisection_steps.forEach(step => {
+                html += `<tr>
+                            <td class="px-4 py-2 font-mono">${step.k}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step.a, 6)}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step.b, 6)}</td>
+                            <td class="px-4 py-2 font-mono text-purple-700 font-semibold">${formatNumber(step.c, 6)}</td>
+                            <td class="px-4 py-2 font-mono">${formatNumber(step['f(c)'], 6)}</td>
+                         </tr>`;
+            });
+            html += `</tbody></table></div></details></div>`;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+    resultsArea.innerHTML = html;
+
+    // Thay đổi ở đây: Render chuỗi LaTeX vào container đã tạo
+    const polyContainer = document.getElementById('polynomial-latex-container');
+    if (polyContainer && result.polynomial_str) {
+        try {
+            // Thêm "= 0" vào chuỗi LaTeX và render
+            katex.render(result.polynomial_str + " = 0", polyContainer, {
+                throwOnError: false,
+                displayMode: true
+            });
+        } catch (e) {
+            console.error("Lỗi render KaTeX cho đa thức:", e);
+            // Nếu lỗi, hiển thị dạng văn bản thường để người dùng vẫn thấy kết quả
+            polyContainer.textContent = result.polynomial_str + " = 0";
         }
     }
 }

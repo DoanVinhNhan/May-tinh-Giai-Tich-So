@@ -32,6 +32,11 @@ from numerical_methods.nonlinear_systems.newton import solve_newton_system
 from numerical_methods.nonlinear_systems.newton_modified import solve_newton_modified_system
 from numerical_methods.nonlinear_systems.simple_iteration import solve_simple_iteration_system
 
+from numerical_methods.linear_algebra.iterative_methods.jacobi import solve_jacobi
+from numerical_methods.linear_algebra.iterative_methods.gauss_seidel import solve_gauss_seidel
+
+from numerical_methods.root_finding.polynomial_root_finding import solve_polynomial
+
 
 app = Flask(__name__)
 CORS(app)
@@ -54,6 +59,25 @@ def hpt_solver(solver_function):
         print("Lỗi khi xử lý request HPT:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
+def iterative_hpt_solver(solver_function):
+    data = request.get_json()
+    if not data or 'matrix_a' not in data or 'matrix_b' not in data or 'x0' not in data:
+        return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu ma trận A, B hoặc vector X₀."}), 400
+    try:
+        matrix_a = np.array(data['matrix_a'], dtype=float)
+        matrix_b = np.array(data['matrix_b'], dtype=float)
+        x0 = np.array(data['x0'], dtype=float)
+        
+        eps = float(data.get('tolerance', 1e-5))
+        max_iter = int(data.get('max_iter', 100))
+            
+        result = solver_function(matrix_a, matrix_b, x0, eps=eps, max_iter=max_iter)
+        result['success'] = True if 'error' not in result else False
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý request HPT lặp:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+    
 # --- START: HELPER MỚI CHO TÍNH NGHỊCH ĐẢO ---
 def inverse_solver(solver_function):
     data = request.get_json()
@@ -78,6 +102,15 @@ def inverse_solver(solver_function):
         print("Lỗi khi xử lý request nghịch đảo:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 # --- END: HELPER MỚI ---
+
+
+@app.route('/matrix/iterative/jacobi', methods=['POST'])
+def handle_iterative_jacobi():
+    return iterative_hpt_solver(solve_jacobi)
+
+@app.route('/matrix/iterative/gauss-seidel', methods=['POST'])
+def handle_iterative_gauss_seidel():
+    return iterative_hpt_solver(solve_gauss_seidel)
 
 @app.route('/matrix/svd', methods=['POST'])
 def handle_svd_calculation():
@@ -265,6 +298,19 @@ def solve_nonlinear_system():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f'Đã xảy ra lỗi không xác định: {e}'}), 500
+
+@app.route('/polynomial/solve', methods=['POST'])
+def handle_polynomial_solve():
+    data = request.get_json()
+    if not data or 'coeffs' not in data:
+        return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu các hệ số."}), 400
+    try:
+        coeffs = [float(c) for c in data['coeffs']]
+        result = solve_polynomial(coeffs)
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý request giải đa thức:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
