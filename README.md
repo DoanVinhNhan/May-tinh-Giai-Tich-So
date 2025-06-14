@@ -97,8 +97,4 @@ Một ứng dụng web cung cấp bộ công cụ toàn diện để giải các
     python app.py
     ```
     Server sẽ khởi động, thường là ở địa chỉ `http://127.0.0.1:5001`.
-
-2.  **Mở giao diện người dùng (Frontend):**
-    Mở file `templates/index.html` trực tiếp bằng trình duyệt của bạn.
-
     > **Lưu ý:** Giao diện người dùng đã được thiết kế để giao tiếp với server backend đang chạy. Hãy đảm bảo server Flask luôn hoạt động khi bạn sử dụng ứng dụng.
