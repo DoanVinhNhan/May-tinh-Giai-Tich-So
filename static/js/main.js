@@ -781,7 +781,7 @@ function displaySvdResults(result) {
     const uCols = result.U && result.U[0] ? result.U[0].length : 0;
     const sigmaCols = result.Sigma && result.Sigma[0] ? result.Sigma[0].length : 0;
     const vtCols = result.V_transpose && result.V_transpose[0] ? result.V_transpose[0].length : 0;
-    
+
     html += `<div class="mb-8">
         <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
         <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
@@ -862,13 +862,34 @@ function displayGaussEliminationResults(result) {
 function displayLuResults(result) {
     const resultsArea = document.getElementById('results-area');
     let html = displayGenericHptResults('Kết Quả Giải Hệ Bằng Phân Tách LU', result);
-    if ((result.decomposition && (result.decomposition.L || result.decomposition.P || result.decomposition.U))) {
-        html += `<div class="mt-10"><h3 class="result-heading">Các Ma Trận L, U${result.decomposition?.P ? ', P' : ''}</h3>`;
-        html += `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`;
-        if(result.decomposition.L) html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận L</h4><div class="matrix-display">${formatMatrix(result.decomposition.L)}</div></div>`;
-        if(result.decomposition.U) html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.decomposition.U)}</div></div>`;
-        if(result.decomposition.P) html += `<div><h4 class="font-medium text-center text-gray-700">Ma trận P</h4><div class="matrix-display">${formatMatrix(result.decomposition.P)}</div></div>`;
-        html += `</div></div>`;
+    if (result.decomposition && (result.decomposition.L || result.decomposition.U || result.decomposition.P)) {
+        html += `<div class="mt-10"><h3 class="result-heading">Các Ma Trận Phân Rã</h3>`;
+
+        // Hiển thị ma trận P nếu có (thường là ma trận hoán vị)
+        if (result.decomposition.P) {
+            html += `<div class="mt-6">
+                        <h4 class="font-medium text-center text-gray-700">Ma trận Hoán vị P</h4>
+                        <div class="matrix-display">${formatMatrix(result.decomposition.P)}</div>
+                     </div>`;
+        }
+
+        // Hiển thị ma trận L
+        if (result.decomposition.L) {
+            html += `<div class="mt-6">
+                        <h4 class="font-medium text-center text-gray-700">Ma trận L</h4>
+                        <div class="matrix-display">${formatMatrix(result.decomposition.L)}</div>
+                     </div>`;
+        }
+
+        // Hiển thị ma trận U
+        if (result.decomposition.U) {
+            html += `<div class="mt-6">
+                        <h4 class="font-medium text-center text-gray-700">Ma trận U</h4>
+                        <div class="matrix-display">${formatMatrix(result.decomposition.U)}</div>
+                     </div>`;
+        }
+
+        html += `</div>`; // Đóng thẻ div của mục "Các Ma Trận Phân Rã"
     }
     if (result.status === 'unique_solution' && result.intermediate_y) {
         html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3>`;
