@@ -1224,15 +1224,15 @@ function displayGenericHptResults(title, result) {
     return html;
 }
 function setupNonlinearSystemSolveEvents() {
-    // DOM elements
+    // Lấy các element trên DOM
     const methodSelect = document.getElementById('ns-method-select');
     const expressionsInput = document.getElementById('ns-expressions-input');
     const previewDiv = document.getElementById('ns-latex-preview');
     const x0Input = document.getElementById('ns-x0-input');
     const domainGroup = document.getElementById('ns-domain-group');
-    const domainInput = document.getElementById('ns-domain-input');
     const expressionsLabel = document.getElementById('ns-expressions-label');
     const calculateBtn = document.getElementById('calculate-ns-btn');
+    const normGroup = document.getElementById('ns-norm-selection-group');
 
     const placeholders = {
         newton: "x_1^2 + x_2^2 - 1\nx_1^2 - x_2",
@@ -1240,122 +1240,109 @@ function setupNonlinearSystemSolveEvents() {
         simple_iteration: "\\sqrt{1 - x_2^2}\n\\sqrt{x_1}"
     };
 
-    // Hàm render LaTeX cho hệ phương trình (mỗi dòng một biểu thức)
+    // Hàm render LaTeX cho các biểu thức nhập vào (không đổi)
     function renderSystemLatex() {
         if (!expressionsInput || !previewDiv) return;
-
         const latexLines = expressionsInput.value.trim().split('\n');
         previewDiv.innerHTML = '';
-        previewDiv.classList.remove('text-red-500', 'items-start');
-        previewDiv.classList.add('items-center');
-
-        if (expressionsInput.value.trim() === "") {
-            return;
-        }
+        if (expressionsInput.value.trim() === "") return;
         
-        let hasError = false;
         latexLines.forEach(line => {
-            if (line.trim() === "") {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.innerHTML = '&nbsp;';
-                previewDiv.appendChild(emptyDiv);
-                return;
-            };
             const lineDiv = document.createElement('div');
             lineDiv.className = 'w-full text-center';
             try {
-                katex.render(line, lineDiv, {
-                    throwOnError: true,
-                    displayMode: false
-                });
+                katex.render(line, lineDiv, { throwOnError: true, displayMode: false });
             } catch (error) {
                 lineDiv.textContent = `Lỗi cú pháp: "${line}"`;
                 lineDiv.className = 'w-full text-left text-red-500 text-sm';
-                hasError = true;
             }
             previewDiv.appendChild(lineDiv);
         });
-
-        if (hasError) {
-             previewDiv.classList.remove('items-center');
-             previewDiv.classList.add('items-start');
-        }
     }
     
+    // Hàm cập nhật hiển thị của các thành phần UI (không đổi)
     function updateUIVisibility() {
         const method = methodSelect.value;
         expressionsInput.placeholder = placeholders[method];
+
         if (method === 'simple_iteration') {
-            expressionsLabel.innerHTML = 'Hệ hàm lặp <span class="font-mono text-sm">X = &phi;(X)</span> (dạng LaTeX)';
+            expressionsLabel.innerHTML = 'Hệ hàm lặp <span class="font-mono text-sm">X = &phi;(X)</span>';
             domainGroup.style.display = 'block';
-            domainInput.placeholder = "0 1\n0 1";
         } else {
-            expressionsLabel.innerHTML = 'Hệ phương trình <span class="font-mono text-sm">F(X) = 0</span> (dạng LaTeX)';
+            expressionsLabel.innerHTML = 'Hệ phương trình <span class="font-mono text-sm">F(X) = 0</span>';
             domainGroup.style.display = 'none';
         }
+        
+        const showNormSelector = (method === 'newton' || method === 'newton_modified');
+        normGroup.style.display = showNormSelector ? 'block' : 'none';
+        
         renderSystemLatex();
     }
 
-    // Event listeners
+    // SỬA LỖI: Chỉ render công thức chuẩn một lần duy nhất khi hàm được thiết lập
+    try {
+        const normInfEl = document.getElementById('ns-norm-inf-katex');
+        const norm1El = document.getElementById('ns-norm-1-katex');
+
+        // Kiểm tra xem đã render chưa, nếu rồi thì không làm gì cả
+        if (normInfEl && !normInfEl.hasChildNodes()) {
+            katex.render('\\|v\\|_\\infty', normInfEl, { throwOnError: false, displayMode: false });
+        }
+        if (norm1El && !norm1El.hasChildNodes()) {
+            katex.render('\\|v\\|_1', norm1El, { throwOnError: false, displayMode: false });
+        }
+    } catch (e) {
+        console.error("Lỗi render KaTeX cho lựa chọn chuẩn:", e);
+    }
+    
+    // Gắn các sự kiện (không đổi)
     methodSelect.addEventListener('change', updateUIVisibility);
     expressionsInput.addEventListener('input', renderSystemLatex);
 
     calculateBtn.addEventListener('click', () => {
         const method = methodSelect.value;
-        
-        // Lấy biểu thức LaTeX và chuyển đổi sang cú pháp Python
         const latexExpressions = expressionsInput.value.trim().split('\n').filter(line => line.trim() !== '');
+        if (latexExpressions.length === 0) return displayError('Vui lòng nhập hệ phương trình.');
         const expressions = latexExpressions.map(latexToPython);
         const n = expressions.length;
-        if (n === 0) {
-            displayError('Vui lòng nhập ít nhất một hàm số.');
-            return;
-        }
 
         const x0_lines = x0Input.value.trim().split('\n').filter(line => line.trim() !== '');
-        if (x0_lines.length !== n) {
-            displayError(`Số lượng giá trị ban đầu (${x0_lines.length}) không khớp với số phương trình (${n}).`);
-            return;
-        }
+        if (x0_lines.length !== n) return displayError(`Số lượng giá trị ban đầu (${x0_lines.length}) không khớp với số phương trình (${n}).`);
         const x0 = x0_lines.map(val => parseFloat(val.trim()));
-        if (x0.some(isNaN)) {
-            displayError('Giá trị ban đầu X₀ chứa giá trị không hợp lệ.');
-            return;
-        }
+        if (x0.some(isNaN)) return displayError('Giá trị ban đầu X₀ không hợp lệ.');
+
+        const normChoiceEl = document.querySelector('input[name="ns-norm-option"]:checked');
+        const normChoice = normChoiceEl ? normChoiceEl.value : 'infinity';
 
         const body = {
-            n: n,
-            method: method,
-            expressions: expressions,
-            x0: x0,
+            n: n, method: method, expressions: expressions, x0: x0,
             stop_option: document.getElementById('ns-stop-option-select').value,
             stop_value: document.getElementById('ns-stop-value-input').value,
+            norm_choice: normChoice
         };
 
         if (method === 'simple_iteration') {
+            const domainInput = document.getElementById('ns-domain-input');
             const domain_lines = domainInput.value.trim().split('\n').filter(line => line.trim() !== '');
-            if (domain_lines.length !== n) {
-                displayError(`Số lượng miền D (${domain_lines.length}) không khớp với số phương trình (${n}).`);
-                return;
-            }
-            let a0 = [];
-            let b0 = [];
+            if (domain_lines.length !== n) return displayError(`Số lượng miền D (${domain_lines.length}) không khớp với số phương trình (${n}).`);
+            body.a0 = [];
+            body.b0 = [];
             for (const line of domain_lines) {
                 const parts = line.trim().split(/\s+/);
                 if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
-                    displayError(`Miền D có dòng không hợp lệ: "${line}". Cần 2 số cách nhau bằng dấu cách.`);
-                    return;
+                    return displayError(`Miền D có dòng không hợp lệ: "${line}".`);
                 }
-                a0.push(parseFloat(parts[0]));
-                b0.push(parseFloat(parts[1]));
+                body.a0.push(parseFloat(parts[0]));
+                body.b0.push(parseFloat(parts[1]));
             }
-            body.a0 = a0;
-            body.b0 = b0;
         }
         handleCalculation('/nonlinear-system/solve', body);
     });
+    
+    // Gọi để cập nhật giao diện lần đầu (không đổi)
     updateUIVisibility();
 }
+
 function displayNonlinearSystemResults(result) {
     const resultsArea = document.getElementById('results-area');
     let html = `<h3 class="result-heading">Kết Quả Giải Hệ Phi Tuyến</h3>`;
@@ -1364,13 +1351,31 @@ function displayNonlinearSystemResults(result) {
         html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-green-50 rounded-lg shadow-inner">${result.message}</div>`;
     }
 
-    // Hiển thị nghiệm
     if (result.solution) {
         const solMatrix = result.solution.map(v => [v]);
         html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X ≈</h4><div class="matrix-display">${formatMatrix(solMatrix)}</div></div>`;
     }
 
-    // Hiển thị các thông tin chẩn đoán
+    if (result.J_max_vals) {
+        html += `<div class="mt-8 p-4 border rounded-lg bg-gray-50">
+                    <h4 class="font-semibold text-gray-700 text-lg mb-3 text-center">Phân tích hội tụ (PP Lặp đơn)</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="font-medium text-gray-600 mb-2">Ma trận GTLN của các đạo hàm riêng max|∂φ_i/∂x_j|:</p>
+                            <div class="matrix-display">${formatMatrix(result.J_max_vals, 6)}</div>
+                        </div>
+                        <div class="text-center space-x-4 md:space-x-8 text-sm md:text-base">
+                            <span class="font-medium">Chuẩn hàng (chuẩn ∞): <code class="p-1 bg-gray-200 rounded">${formatNumber(result.max_row_sum, 6)}</code></span>
+                            <span class="font-medium">Chuẩn cột (chuẩn 1): <code class="p-1 bg-gray-200 rounded">${formatNumber(result.max_col_sum, 6)}</code></span>
+                        </div>
+                        <div class="text-center font-bold text-lg p-2 bg-blue-100 text-blue-800 rounded-md">
+                            Hệ số co K = ${formatNumber(result.contraction_factor_K, 6)}
+                            <span class="text-base font-medium">(tính theo chuẩn ${result.norm_used_for_K === '1' ? '1' : 'vô cùng'})</span>
+                        </div>
+                    </div>
+                 </div>`;
+    }
+
     let diagnosticHtml = '';
     if (result.jacobian_matrix_latex) {
         diagnosticHtml += `<div class="p-4 bg-gray-50 rounded-lg flex flex-col">
@@ -1384,58 +1389,46 @@ function displayNonlinearSystemResults(result) {
                     <div class="flex-grow flex items-center justify-center">${formatMatrix(result.J0_inv_matrix, 5)}</div>
                  </div>`;
     }
-    // Các thông tin khác có thể thêm vào đây
     
     if (diagnosticHtml) {
-        // Thay đổi ở đây: Dùng flex, flex-wrap và justify-center
-        html += `<div class="flex flex-wrap justify-center gap-6 mb-8">
-                    ${diagnosticHtml}
-                 </div>`;
+        html += `<div class="flex flex-wrap justify-center gap-6 mt-8 mb-8">${diagnosticHtml}</div>`;
     }
 
-    // Hiển thị bảng lặp
     if (result.steps && result.steps.length > 0) {
         html += `<div class="mt-10"><h3 class="result-heading">Bảng Các Bước Lặp</h3>`;
         const headers = Object.keys(result.steps[0]);
+        // Sửa lại tên cột error cho thân thiện hơn
+        const headerDisplayMap = {
+            'error': 'Sai số'
+        }
         html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
         headers.forEach(header => {
-            html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider font-mono">${header}</th>`;
+            html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider font-mono">${headerDisplayMap[header] || header}</th>`;
         });
         html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
-
-        // --- PHẦN SỬA LỖI ---
         result.steps.forEach(step => {
             html += `<tr>`;
-            // Vòng lặp đúng: duyệt qua tất cả headers
             headers.forEach(header => {
-                 const value = step[header];
-                 html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(value)}</td>`;
+                 html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(step[header], 6)}</td>`;
             });
             html += `</tr>`;
         });
-        // --- KẾT THÚC PHẦN SỬA LỖI ---
-
         html += `</tbody></table></div></div>`;
     }
     
     resultsArea.innerHTML = html;
     
-    // Render KaTeX cho ma trận Jacobi
     if (result.jacobian_matrix_latex) {
         const container = document.getElementById('jacobian-matrix-container');
         if (container) {
             container.querySelectorAll('td').forEach(cell => {
-                try {
-                    katex.render(cell.textContent, cell, { 
-                        throwOnError: false, 
-                        displayMode: false 
-                    });
-                } catch(e) { console.error('Lỗi render KaTeX:', e); }
+                try { katex.render(cell.textContent, cell, { throwOnError: false, displayMode: false }); } catch(e) { console.error('Lỗi render KaTeX:', e); }
             });
         }
     }
 }
+
 function displayIterativeHptResults(result, method) {
     const resultsArea = document.getElementById('results-area');
     let html = `<h3 class="result-heading">Kết Quả Giải Hệ Bằng ${method.charAt(0).toUpperCase() + method.slice(1)}</h3>`;

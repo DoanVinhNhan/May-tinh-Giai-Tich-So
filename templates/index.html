@@ -365,7 +365,26 @@ sidebarToggle.addEventListener('click', () => {
                 <input id="ns-stop-value-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="0.0001">
             </div>
         </div>
-        
+
+        <!-- Khối chọn chuẩn tính sai số cho PP Newton -->
+        <div id="ns-norm-selection-group" style="display:none;">
+            <label class="block text-sm font-medium text-gray-700">Chọn chuẩn</label>
+            <div class="mt-2 flex items-center space-x-6 p-3 bg-gray-50 rounded-md">
+                <div class="flex items-center">
+                    <input id="ns-norm-inf" name="ns-norm-option" type="radio" value="infinity" checked class="h-4 w-4 text-yellow-600 border-gray-300 focus:ring-yellow-500">
+                    <label for="ns-norm-inf" class="ml-2 flex items-center cursor-pointer">
+                        <span class="font-mono text-lg" id="ns-norm-inf-katex"></span>
+                    </label>
+                </div>
+                <div class="flex items-center">
+                    <input id="ns-norm-1" name="ns-norm-option" type="radio" value="1" class="h-4 w-4 text-yellow-600 border-gray-300 focus:ring-yellow-500">
+                    <label for="ns-norm-1" class="ml-2 flex items-center cursor-pointer">
+                        <span class="font-mono text-lg" id="ns-norm-1-katex"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label id="ns-expressions-label" class="block text-sm font-medium text-gray-700">Hệ phương trình F(X) = 0 (dạng LaTeX)</label>
@@ -374,7 +393,7 @@ sidebarToggle.addEventListener('click', () => {
                 <div id="ns-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[80px] flex flex-col items-center justify-center text-lg space-y-2"></div>
                 <div id="ns-domain-group" class="mt-4" style="display:none;">
                      <label class="block text-sm font-medium text-gray-700">Miền hộp D = [a, b] (mỗi miền một dòng cách nhau bằng khoảng trắng)</label>
-                     <textarea id="ns-domain-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0, 1&#10;0 1"></textarea>
+                     <textarea id="ns-domain-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0 1&#10;0 1"></textarea>
                 </div>
             </div>
             <div>
@@ -383,6 +402,15 @@ sidebarToggle.addEventListener('click', () => {
             </div>
         </div>
     </div>
+    
+    <div class="mt-8 mb-8">
+        <button id="calculate-ns-btn" class="action-btn bg-yellow-600 hover:bg-yellow-700">Giải Hệ Phi Tuyến</button>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
     
     <div class="mt-8 mb-8">
         <button id="calculate-ns-btn" class="action-btn bg-yellow-600 hover:bg-yellow-700">Giải Hệ Phi Tuyến</button>
