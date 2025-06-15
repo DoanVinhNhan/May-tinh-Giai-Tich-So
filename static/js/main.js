@@ -58,6 +58,27 @@ function setupDisplaySettingsEvents() {
     });
 }
 
+
+
+// Hàm trợ giúp để tạo bảng
+function createIterativeTable(rows, headers) {
+    let table = `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50"><tr>`;
+    headers.forEach(h => table += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">${h}</th>`);
+    table += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+    rows.forEach(row => {
+        const x_k_formatted = Array.isArray(row.x_k[0]) ? formatMatrix(row.x_k) : `[${row.x_k.map(v => formatNumber(v)).join(', ')}]`;
+        const errorFormatted = (typeof row.error === 'string') ? row.error : formatNumber(row.error);
+        table += `<tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${row.k}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${x_k_formatted}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${errorFormatted}</td>
+                  </tr>`;
+    });
+    table += `</tbody></table></div>`;
+    return table;
+}
+
     // --- Hàm chuyển đổi LaTeX sang Python ---
 function latexToPython(latex) {
     if (!latex) return "";
@@ -1732,8 +1753,30 @@ function displayIterativeHptResults(result, method) {
     attachCopyMatrixEvents();
 }
 function setupMatrixSolveIterativeEvents() {
+    // Logic chuyển tab
+    const tabs = document.querySelectorAll('.iter-hpt-tab');
+    const tabContents = document.querySelectorAll('.iter-hpt-tab-content');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(item => {
+                item.classList.remove('text-blue-600', 'border-blue-500');
+                item.classList.add('text-gray-500', 'border-transparent', 'hover:text-gray-700', 'hover:border-gray-300');
+            });
+            tab.classList.add('text-blue-600', 'border-blue-500');
+            tab.classList.remove('text-gray-500', 'border-transparent');
+            const targetContentId = `iter-hpt-${tab.dataset.tab}-content`;
+            tabContents.forEach(content => {
+                content.style.display = content.id === targetContentId ? 'block' : 'none';
+            });
+            resetDisplay();
+        });
+    });
+
+    // Gắn sự kiện cho các nút
     document.getElementById('calculate-jacobi-btn').onclick = () => setupIterativeHptCalculation('/matrix/iterative/jacobi');
     document.getElementById('calculate-gs-btn').onclick = () => setupIterativeHptCalculation('/matrix/iterative/gauss-seidel');
+    // Gắn sự kiện cho nút mới
+    document.getElementById('calculate-simple-iteration-btn').onclick = () => setupSimpleIterationHptCalculation('/matrix/iterative/simple-iteration');
 }
 function setupIterativeHptCalculation(endpoint) {
     const matrixA_Input = document.getElementById('matrix-a-input-iter');
@@ -1881,4 +1924,106 @@ function displayPolynomialResults(result) {
             polyContainer.textContent = result.polynomial_str + " = 0";
         }
     }
+}
+
+function setupSimpleIterationHptCalculation(endpoint) {
+    const matrixB_Input = document.getElementById('matrix-b-input-simple-iter');
+    const matrixD_Input = document.getElementById('matrix-d-input-simple-iter');
+    const x0_Input = document.getElementById('x0-input-simple-iter');
+    const tolerance_Input = document.getElementById('simple-iter-tolerance');
+    const maxIter_Input = document.getElementById('simple-iter-max-iter');
+    const normChoice_Input = document.getElementById('simple-iter-norm-choice');
+
+    const matrixB = parseMatrix(matrixB_Input.value);
+    if (matrixB.error || matrixB.length === 0) return displayError(matrixB.error || 'Ma trận B không được để trống.');
+
+    const matrixD = parseMatrix(matrixD_Input.value);
+    if (matrixD.error || matrixD.length === 0) return displayError(matrixD.error || 'Ma trận d không được để trống.');
+    
+    const x0 = parseMatrix(x0_Input.value);
+    if (x0.error || x0.length === 0) return displayError(x0.error || 'Vector lặp ban đầu X₀ không được để trống.');
+
+    if (matrixB.length !== matrixB[0].length) return displayError('Ma trận B phải là ma trận vuông.');
+    if (matrixB.length !== matrixD.length || matrixB.length !== x0.length) return displayError(`Số hàng của ma trận B (${matrixB.length}), d (${matrixD.length}) và X₀ (${x0.length}) phải bằng nhau.`);
+     
+    const body = {
+        matrix_b: matrixB,
+        matrix_d: matrixD,
+        x0: x0,
+        tolerance: parseFloat(tolerance_Input.value),
+        max_iter: parseInt(maxIter_Input.value),
+        norm_choice: normChoice_Input.value
+    };
+    handleCalculation(endpoint, body);
+}
+
+function displayIterativeHptResults(result, method) {
+    const resultsArea = document.getElementById('results-area');
+    const methodMap = {
+        'jacobi': 'Jacobi',
+        'gauss-seidel': 'Gauss-Seidel',
+        'simple-iteration': 'Lặp Đơn'
+    };
+    let html = `<h3 class="result-heading">Kết Quả Giải Hệ Bằng ${methodMap[method] || method}</h3>`;
+
+    if (result.message) {
+        html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-blue-50 rounded-lg shadow-inner">${result.message}</div>`;
+    }
+    if (result.warning_message || result.warning) { // Hỗ trợ cả hai tên key
+        html += `<div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">${result.warning_message || result.warning}</div>`;
+    }
+
+    if (result.solution) {
+        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
+    }
+    
+    // Phần hiển thị thông tin hội tụ cho PP Lặp Đơn
+    if (method === 'simple-iteration') {
+        const normSymbol = result.norm_used === '1' ? '₁' : '∞';
+        html += `<div class="mt-8 p-4 border rounded-lg bg-gray-50">
+                    <h4 class="font-semibold text-gray-700 text-lg mb-3 text-center">Phân Tích Hội Tụ</h4>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                         <div class="p-3 bg-gray-100 rounded-md">
+                            <span class="font-medium">Chuẩn ma trận lặp ||B||${normSymbol}</span>
+                            <p class="font-mono text-xl">${formatNumber(result.norm_B, 6)}</p>
+                         </div>
+                         <div class="p-3 bg-gray-100 rounded-md">
+                            <span class="font-medium">Ngưỡng dừng thực tế</span>
+                            <p class="font-mono text-xl">${formatNumber(result.stopping_threshold, 8)}</p>
+                         </div>
+                     </div>
+                 </div>`;
+    }
+
+    if (result.steps && result.steps.length > 0) {
+        const firstStep = result.steps[0];
+        let tableHtml = '';
+
+        if (firstStep.table) { // Jacobi, Gauss-Seidel
+            tableHtml = createIterativeTable(firstStep.table, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||∞']);
+        } else if (firstStep.B) { // Jacobi (cách hiển thị cũ)
+             html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
+             result.steps.forEach(step => {
+                 if (step.table) {
+                    tableHtml = createIterativeTable(step.table, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||∞']);
+                    html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>${tableHtml}</div>`;
+                 } else {
+                    html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
+                    if(step.B) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp B:</span><div class="matrix-display">${formatMatrix(step.B)}</div></div>`;
+                    if(step.d) html += `<div class="mt-2"><span class="font-semibold">Vector d:</span><div class="matrix-display">${formatMatrix(step.d)}</div></div>`;
+                    html += `</div>`;
+                 }
+             });
+             html += `</div></div>`;
+        } else { // Simple Iteration
+            tableHtml = createIterativeTable(result.steps, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||']);
+        }
+
+        if (tableHtml) {
+             html += `<div class="mt-10"><h3 class="result-heading">Bảng Quá Trình Lặp</h3>${tableHtml}</div>`;
+        }
+    }
+    
+    resultsArea.innerHTML = html;
+    attachCopyMatrixEvents();
 }
