@@ -210,55 +210,40 @@ def solve_nonlinear_equation():
     try:
         a = float(data['interval_a'])
         b = float(data['interval_b'])
-        stop_value = data.get('value')
+        stop_value_str = data.get('value')
         mode = data.get('mode', 'absolute_error')
-        stop_condition = data.get('stop_condition')
+        stop_condition = data.get('stop_condition') # Dùng cho Newton, Secant
 
-        if method == 'simple_iteration':
-            parsed_result = parse_phi_expression(expression_str)
-        else:
-            parsed_result = parse_expression(expression_str)
-
-        if not parsed_result.get('success'):
-            return jsonify({'success': False, 'error': parsed_result.get('error', 'Lỗi phân tích biểu thức.')})
-
-        f = parsed_result.get('f')
-        if method == 'simple_iteration':
-            phi = parsed_result.get('phi')
-
-        if method in ['bisection', 'newton', 'secant']:
-            try:
-                fa = f(a)
-                fb = f(b)
-                if fa * fb >= 0 and method == 'bisection':
-                    return jsonify({'success': False, 'error': f'Khoảng [{a}, {b}] không phải là khoảng cách ly nghiệm vì f(a)={fa:.4f} và f(b)={fb:.4f} không trái dấu.'})
-            except (ValueError, TypeError) as e:
-                 return jsonify({'success': False, 'error': f'Không thể tính giá trị hàm tại điểm a={a} hoặc b={b}. Lỗi: {e}'})
+        if not stop_value_str:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập giá trị cho điều kiện dừng.'})
         
-        try:
-            if mode == 'iterations':
-                N = int(float(stop_value))
-                tol = 1e-6 
-            else:
-                tol = float(stop_value)
-                N = 200
-        except (ValueError, TypeError):
-             return jsonify({'success': False, 'error': 'Giá trị điều kiện dừng phải là một con số.'})
+        stop_value = float(stop_value_str)
 
-        if method == 'bisection':
-            result = solve_bisection(f, a, b, mode, stop_value)
-        elif method == 'newton':
-            result = solve_newton(expression_str, a, b, tol, N, mode, stop_condition)
-        elif method == 'secant':
-            result = solve_secant(parsed_result, a, b, mode, tol, stop_condition)
-        elif method == 'simple_iteration':
+        if method == 'simple_iteration':
+            # Phương pháp lặp đơn không dùng stop_condition
             x0_str = data.get('x0')
             if x0_str is None or x0_str == '':
                 return jsonify({'success': False, 'error': 'Vui lòng nhập điểm bắt đầu x₀.'})
             x0 = float(x0_str)
-            result = solve_simple_iteration(expression_str, a, b, x0, tol, N, mode)
+            # Truyền mode và value trực tiếp
+            result = solve_simple_iteration(expression_str, a, b, x0, mode, stop_value)
         else:
-            return jsonify({'success': False, 'error': 'Phương pháp không hợp lệ.'})
+            # Các phương pháp khác
+            if method == 'bisection':
+                parsed_result = parse_expression(expression_str)
+                if not parsed_result.get('success'): return jsonify(parsed_result)
+                f = parsed_result.get('f')
+                result = solve_bisection(f, a, b, mode, stop_value)
+            elif method == 'newton':
+                parsed_result = parse_expression(expression_str)
+                if not parsed_result.get('success'): return jsonify(parsed_result)
+                result = solve_newton(expression_str, a, b, mode, stop_value, stop_condition)
+            elif method == 'secant':
+                parsed_result = parse_expression(expression_str)
+                if not parsed_result.get('success'): return jsonify(parsed_result)
+                result = solve_secant(parsed_result, a, b, mode, stop_value, stop_condition)
+            else:
+                return jsonify({'success': False, 'error': 'Phương pháp không hợp lệ.'})
         
         return jsonify(result)
 

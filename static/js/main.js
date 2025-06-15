@@ -130,30 +130,43 @@ function parseMatrix(matrixString) {
 function formatNumber(num, precision = displayPrecision) {
     if (num === null || num === undefined) return 'N/A';
 
-    // Case 1: The number is already in the correct object format {re, im}
+    // Nên định nghĩa một hằng số sai số nhỏ ở đây
+    const zeroTolerance = 1e-9;
+
+    // 1. Hàm phụ trợ để định dạng một số thực
+    const formatReal = (realNum) => {
+        // Kiểm tra xem số có phải là số nguyên không
+        if (Math.abs(realNum - Math.round(realNum)) < zeroTolerance) {
+            return Math.round(realNum).toString(); // Trả về dạng số nguyên
+        }
+        // Nếu không thì trả về dạng có phần thập phân
+        return realNum.toFixed(precision);
+    };
+
+    // Case 1: Số phức dạng object {re, im}
     if (typeof num === 'object' && num !== null && num.hasOwnProperty('re') && num.hasOwnProperty('im')) {
         let realPart = num.re;
         let imagPart = num.im;
         if (Math.abs(realPart) < zeroTolerance) realPart = 0;
         if (Math.abs(imagPart) < zeroTolerance) imagPart = 0;
 
-        if (imagPart === 0) return realPart.toFixed(precision);
+        // SỬA LỖI: Dùng hàm formatReal
+        if (imagPart === 0) return formatReal(realPart);
         
         const sign = imagPart < 0 ? ' - ' : ' + ';
-        return `${realPart.toFixed(precision)}${sign}${Math.abs(imagPart).toFixed(precision)}i`;
+        // SỬA LỖI: Dùng hàm formatReal cho cả hai phần
+        return `${formatReal(realPart)}${sign}${formatReal(Math.abs(imagPart))}i`;
     }
 
-    // Case 2: The number is a standard JavaScript number (real)
+    // Case 2: Số thực thông thường
     if (typeof num === 'number') {
-        if (Math.abs(num) < zeroTolerance) return (0).toFixed(precision);
-        return num.toFixed(precision);
+        // SỬA LỖI QUAN TRỌNG NHẤT: Phải truyền `num`, không phải `precision`
+        return formatReal(num);
     }
 
-    // Case 3 (IMPROVED): The number is a pre-formatted string from the backend (e.g., "0.5+0.86j" or "1.2e-5-3.4e-6j")
+    // Case 3: Số phức dạng chuỗi
     if (typeof num === 'string' && num.endsWith('j')) {
         let splitPos = -1;
-        // Find the separator (+ or -) by iterating from the end.
-        // This is more robust than lastIndexOf because it can ignore signs in scientific notation (e.g., "e-5").
         for (let i = num.length - 2; i > 0; i--) {
             if (num[i] === '+' || num[i] === '-') {
                 if (num[i-1].toLowerCase() !== 'e') {
@@ -165,23 +178,24 @@ function formatNumber(num, precision = displayPrecision) {
 
         if (splitPos !== -1) {
             const realStr = num.substring(0, splitPos);
-            const imagStr = num.substring(splitPos, num.length - 1); // remove 'j'
+            const imagStr = num.substring(splitPos, num.length - 1);
             
             const realPart = parseFloat(realStr);
             const imagPart = parseFloat(imagStr);
 
             if (!isNaN(realPart) && !isNaN(imagPart)) {
-                // Successfully parsed, now format it correctly
+                // SỬA LỖI: Dùng hàm formatReal
                 if (Math.abs(imagPart) < zeroTolerance) {
-                     return realPart.toFixed(precision);
+                     return formatReal(realPart);
                 }
                 const sign = imagPart < 0 ? ' - ' : ' + ';
-                return `${realPart.toFixed(precision)}${sign}${Math.abs(imagPart).toFixed(precision)}i`;
+                // SỬA LỖI: Dùng hàm formatReal cho cả hai phần
+                return `${formatReal(realPart)}${sign}${formatReal(Math.abs(imagPart))}i`;
             }
         }
     }
 
-    // Fallback: return the number/string as is if it doesn't match any case
+    // Fallback
     return num;
 }
 
@@ -610,117 +624,53 @@ function setupMatrixEigenMethodsEvents() {
 }
 
 // Hàm hiển thị kết quả cho 2 phương pháp Lũy thừa
-function displayEigenPowerResults(result) {
-    const resultsArea = document.getElementById('results-area');
-    let html = ``;
-
-    if (result.success) {
-
-        // Hiển thị thông báo chung (ví dụ: "Tìm thấy 3 giá trị riêng...")
-        html += `<h3 class="text-xl font-bold text-gray-800 mb-4">${result.message}</h3>`;
-
-        if (result.warnings && result.warnings.length > 0) {
-            result.warnings.forEach(warning => {
-                // Xây dựng chuỗi HTML cho thẻ div cảnh báo, không phải tạo đối tượng
-                html += `
-                    <div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">
-                        <i class="fa-solid fa-triangle-exclamation mr-2"></i>${warning}
-                    </div>
-                `;
-            });
-        }
-        // Box chứa kết quả cuối cùng
-        html += `<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">`;
-        html += `<h4 class="font-semibold text-lg text-blue-800 mb-2">Kết quả cuối cùng:</h4>`;
-        
-        // Lặp qua từng cặp giá trị riêng, vector riêng tìm được
-        result.eigenvalues.forEach((lambda, i) => {
-            html += `<div class="mb-3">
-                <p><strong>Giá trị riêng ${i + 1}:</strong> <code class="font-mono text-blue-700 bg-blue-100 p-1 rounded">${formatNumber(lambda)}</code></p>
-                <p><strong>Vector riêng tương ứng ${i + 1}:</strong></p>
-                ${formatMatrix([result.eigenvectors[i]], 'v', 'vector-style')}
-            </div>`;
-        });
-        html += `</div>`;
-
-        // Khu vực hiển thị các bước trung gian
-        html += `<h3 class="text-xl font-bold text-gray-800 my-4">Các bước tính toán chi tiết</h3>`;
-        
-        // Lặp qua các bước lớn (mỗi bước tìm một giá trị riêng)
-        result.steps.forEach(step => {
-            html += `<details class="bg-gray-50 border rounded-lg mb-4">
-                        <summary class="p-4 cursor-pointer font-semibold text-gray-700">
-                            Tìm giá trị riêng thứ ${step.eigenvalue_index} (λ ≈ ${formatNumber(step.iteration_summary.found_eigenvalue)})
-                        </summary>
-                        <div class="p-4 border-t">`;
-            
-            // Nếu đây không phải GTR đầu tiên, hiển thị ma trận đã xuống thang
-            if (step.eigenvalue_index > 1) {
-                html += `<h5 class="font-semibold mb-2">Ma trận sau khi xuống thang (A<sub>${step.eigenvalue_index - 1}</sub>):</h5>`;
-                html += formatMatrix(step.matrix_before_deflation, 'A');
-            }
-
-            // Bảng chi tiết quá trình lặp
-            html += `<h5 class="font-semibold my-3">Quá trình lặp:</h5>`;
-            html += `<div class="overflow-x-auto max-h-96">
-                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
-                                    <th class="px-4 py-2 text-left font-medium text-gray-600">x<sub>k</sub> (vector lặp)</th>
-                                    <th class="px-4 py-2 text-left font-medium text-gray-600">A·x<sub>k</sub></th>
-                                    <th class="px-4 py-2 text-left font-medium text-gray-600">λ<sub>k</sub> (ước lượng GTR)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">`;
-
-            // Lặp qua từng vòng lặp nhỏ trong một bước lớn
-            step.iteration_details.forEach(iter => {
-                html += `<tr>
-                            <td class="px-4 py-2 font-mono">${iter.k}</td>
-                            <td class="px-4 py-2 font-mono">[${iter.x_k.map(formatNumber).join(', ')}]</td>
-                            <td class="px-4 py-2 font-mono">[${iter.Ax_k.map(formatNumber).join(', ')}]</td>
-                            <td class="px-4 py-2 font-mono">${formatNumber(iter.lambda_k)}</td>
-                         </tr>`;
-            });
-            html += `       </tbody>
-                        </table>
-                      </div>`; // end overflow-x-auto
-            html += `</div></details>`;
-        });
-    } else {
-        // Nếu có lỗi, hiển thị thông báo lỗi
-        showError(result.error);
-    }
-
-    // Đưa toàn bộ HTML đã tạo vào trang web
-    resultsArea.innerHTML = html;
-}
-
-// ===============================================
-// === START: CODE MỚI CHO PHƯƠNG TRÌNH PHI TUYẾN
-// ===============================================
-
 function setupNonlinearSolveEvents() {
     // --- Lấy các element trên DOM ---
     const methodSelect = document.getElementById('nonlinear-method-select');
     const calculateBtn = document.getElementById('calculate-nonlinear-btn');
     
-    // Groups
+    // THÊM MỚI: Lấy element của dropdown điều kiện dừng
+    const stopModeSelect = document.getElementById('stop-mode-select');
+
     const fGroup = document.getElementById('f-expression-group');
     const phiGroup = document.getElementById('phi-expression-group');
     const x0Group = document.getElementById('x0-group');
     const advancedStopGroup = document.getElementById('advanced-stop-condition-group');
 
-    // Inputs
     const fInput = document.getElementById('f-expression-input');
     const phiInput = document.getElementById('phi-expression-input');
 
-    // Previews
     const fPreview = document.getElementById('f-latex-preview');
     const phiPreview = document.getElementById('phi-latex-preview');
+    
+    const advLabel1 = document.getElementById('adv-stop-label-1');
+    const advLabel2 = document.getElementById('adv-stop-label-2');
 
-    // --- Hàm render LaTeX (live preview) ---
+    // SỬA ĐỔI: Tạo cấu trúc dữ liệu mới chứa cả công thức sai số tuyệt đối và tương đối
+    const errorFormulas = {
+        newton: {
+            absolute: {
+                opt1: String.raw`\frac{|f(x_{n})|}{m_1}`,
+                opt2: String.raw`\frac{M_2}{2m_1}|x_{n+1}-x_n|^2`
+            },
+            relative: {
+                opt1: String.raw`\frac{|f(x_{n})|}{m_1 |x_n|}`,
+                opt2: String.raw`\frac{M_2}{2m_1}\frac{|x_{n+1}-x_n|^2}{|x_{n+1}|}`
+            }
+        },
+        secant: {
+            absolute: {
+                opt1: String.raw`\frac{|f(x_n)|}{m_1}`,
+                opt2: String.raw`\frac{M_1-m_1}{m_1}|x_n-x_{n-1}|`
+            },
+            relative: {
+                opt1: String.raw`\frac{|f(x_n)|}{m_1 |x_n|}`,
+                opt2: String.raw`\frac{M_1-m_1}{m_1}\frac{|x_n-x_{n-1}|}{|x_{n+1}|}`
+            }
+        }
+    };
+
+    // --- Hàm render LaTeX (live preview) --- (Giữ nguyên)
     function renderLatex(inputElement, previewElement) {
         const latexString = inputElement.value;
         if (latexString.trim() === "") {
@@ -729,11 +679,7 @@ function setupNonlinearSolveEvents() {
             return;
         }
         try {
-            // Render trực tiếp chuỗi LaTeX người dùng nhập
-            katex.render(latexString, previewElement, {
-                throwOnError: true,
-                displayMode: true
-            });
+            katex.render(latexString, previewElement, { throwOnError: true, displayMode: true });
             previewElement.classList.remove('text-red-500');
         } catch (error) {
             previewElement.textContent = "Lỗi cú pháp LaTeX";
@@ -745,35 +691,61 @@ function setupNonlinearSolveEvents() {
     fInput.addEventListener('input', () => renderLatex(fInput, fPreview));
     phiInput.addEventListener('input', () => renderLatex(phiInput, phiPreview));
     
-    // Cập nhật UI dựa trên phương pháp được chọn
+    // SỬA ĐỔI HOÀN TOÀN: Hàm cập nhật giao diện
     function updateUIVisibility() {
         const method = methodSelect.value;
+        const mode = stopModeSelect.value; // Lấy cả mode (tuyệt đối, tương đối, lặp)
+
+        // 1. Ẩn/hiện các ô nhập f(x) và φ(x)
         fGroup.style.display = (method !== 'simple_iteration') ? 'block' : 'none';
         phiGroup.style.display = (method === 'simple_iteration') ? 'block' : 'none';
         x0Group.style.display = (method === 'simple_iteration') ? 'block' : 'none';
-        advancedStopGroup.style.display = (method === 'newton' || method === 'secant') ? 'block' : 'none';
-        // Trigger render lại preview khi chuyển phương pháp
+        
+        // 2. Điều kiện để hiện khung chọn công thức sai số
+        const showAdvanced = (method === 'newton' || method === 'secant') && 
+                             (mode === 'absolute_error' || mode === 'relative_error');
+        
+        advancedStopGroup.style.display = showAdvanced ? 'block' : 'none';
+        
+        if (showAdvanced) {
+            // Lấy đúng bộ công thức dựa trên cả phương pháp và loại sai số
+            const errorModeKey = mode.split('_')[0]; // 'absolute_error' -> 'absolute'
+            const formulaSet = errorFormulas[method][errorModeKey];
+            
+            if (formulaSet) {
+                try {
+                    katex.render(formulaSet.opt1, advLabel1, { throwOnError: false, displayMode: false });
+                    katex.render(formulaSet.opt2, advLabel2, { throwOnError: false, displayMode: false });
+                } catch (e) {
+                    console.error("Lỗi render KaTeX:", e);
+                }
+            }
+        }
+        
         renderLatex(fInput, fPreview);
         renderLatex(phiInput, phiPreview);
     }
 
+    // Gắn sự kiện cho cả hai dropdown
     methodSelect.addEventListener('change', updateUIVisibility);
+    stopModeSelect.addEventListener('change', updateUIVisibility); // THÊM MỚI
 
+    // Logic nút "Giải" (giữ nguyên như trước)
     calculateBtn.addEventListener('click', () => {
         const method = methodSelect.value;
         const latexExpression = (method === 'simple_iteration') ? phiInput.value : fInput.value;
-        
-        // Chuyển đổi LaTeX sang Python trước khi gửi
         const pythonExpression = latexToPython(latexExpression);
-        
+        const stopConditionElement = document.querySelector('input[name="advanced-stop-option"]:checked');
+        const stopConditionValue = stopConditionElement ? stopConditionElement.value : null;
+
         const body = {
             method: method,
-            expression: pythonExpression, // Gửi biểu thức đã chuyển đổi
+            expression: pythonExpression,
             interval_a: document.getElementById('interval-a-input').value,
             interval_b: document.getElementById('interval-b-input').value,
             mode: document.getElementById('stop-mode-select').value,
             value: document.getElementById('stop-value-input').value,
-            stop_condition: (method === 'newton' || method === 'secant') ? document.getElementById('advanced-stop-select').value : null,
+            stop_condition: stopConditionValue, 
         };
 
         if (method === 'simple_iteration') {
@@ -805,6 +777,7 @@ function setupNonlinearSolveEvents() {
 function displayNonlinearEquationResults(result) {
     const resultsArea = document.getElementById('results-area');
     
+    // Phần 1: Hiển thị kết quả tóm tắt
     let html = `
         <h3 class="result-heading">Kết Quả Giải Phương Trình</h3>
         <div class="text-center font-medium text-lg mb-6 p-4 bg-green-50 rounded-lg shadow-inner">
@@ -815,32 +788,67 @@ function displayNonlinearEquationResults(result) {
         </div>
     `;
 
-    // === BƯỚC 1: SỬA LỖI HTML ===
-    // Thêm các ID duy nhất là 'm1-container' và 'M1-container'
-    if (result.hasOwnProperty('m1') && result.hasOwnProperty('M1')) {
-        html += `
-        <div class="text-center text-sm text-gray-800 mb-6 p-3 bg-gray-100 rounded-md">
-            <span>Điều kiện hội tụ: </span>
-            <span class="font-mono" id="m1-container">m_1 = \\min|f'(x)| \\approx ${formatNumber(result.m1, 4)}</span>; 
-            <span class="font-mono" id="M1-container">M_1 = \\max|f''(x)| \\approx ${formatNumber(result.M1, 4)}</span>
-        </div>
-        `;
+    // Phần 2: Chỉ hiển thị các hệ số có trong kết quả trả về
+    let coeffsHtmlParts = [];
+    if (result.hasOwnProperty('m1')) {
+        coeffsHtmlParts.push(`<span class="font-mono" id="m1-container">m_1 = \\min|f'(x)| \\approx ${formatNumber(result.m1, 4)}</span>`);
+    }
+    if (result.hasOwnProperty('M1')) {
+        coeffsHtmlParts.push(`<span class="font-mono" id="M1-container">M_1 = \\max|f'(x)| \\approx ${formatNumber(result.M1, 4)}</span>`);
+    }
+    if (result.hasOwnProperty('M2')) {
+        coeffsHtmlParts.push(`<span class="font-mono" id="M2-container">M_2 = \\max|f''(x)| \\approx ${formatNumber(result.M2, 4)}</span>`);
+    }
+    if (result.hasOwnProperty('q')) {
+        coeffsHtmlParts.push(`<span class="font-mono" id="q-container">q = \\max|\\phi'(x)| \\approx ${formatNumber(result.q, 4)}</span>`);
     }
 
+    if (coeffsHtmlParts.length > 0) {
+        html += `<div class="text-center text-sm text-gray-800 mb-6 p-3 bg-gray-100 rounded-md">
+                    <span class="font-semibold">Các hệ số hội tụ: </span>
+                    ${coeffsHtmlParts.join('; &nbsp; ')}
+                 </div>`;
+    }
+
+    // Phần 3: Hiển thị bảng các bước lặp với thứ tự cột được sắp xếp
     if (result.steps && result.steps.length > 0) {
         html += `<div class="mt-10"><h3 class="result-heading">Bảng Các Bước Lặp</h3>`;
         
-        const headerMap = {
-            'k': 'k', 'x_k': 'x_k', 'a': 'a_k', 'b': 'b_k', 'c': 'c_k',
-            'f_c': 'f(c_k)', 'x_k+1': 'x_{k+1}', 'phi(x_k)': '\\phi(x_k)',
-            'f_xk': 'f(x_k)', 'df_xk': "f'(x_k)", 'error': '\\text{error}'
-        };
-        
         const headers = Object.keys(result.steps[0]);
+
+        // SỬA ĐỔI: Cập nhật lại mảng thứ tự ưu tiên cho các cột
+        const preferredOrder = [
+            'n', 'k',         // 1. Cột lặp
+            'a', 'a_k',       // 2. Cột biên a (cho Bisection)
+            'b', 'b_k',       // 3. Cột biên b (cho Bisection)
+            'c', 'c_k', 'x_n', 'x_k', // 4. Cột nghiệm xấp xỉ
+            'f(c)', 'f(c_k)', 'f(x_n)', 'f_xk', 'f(x_k)', // 5. Cột giá trị hàm
+            'error'           // 6. Cột sai số
+            // Các cột khác sẽ được sắp xếp theo alphabet sau các cột này
+        ];
+
+        headers.sort((a, b) => {
+            let indexA = preferredOrder.indexOf(a);
+            let indexB = preferredOrder.indexOf(b);
+            if (indexA === -1) indexA = Infinity;
+            if (indexB === -1) indexB = Infinity;
+            if (indexA !== indexB) return indexA - indexB;
+            return a.localeCompare(b);
+        });
+        
         html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
+        
         headers.forEach(header => {
-            html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider"><span id="header-${header}"></span></th>`;
+            const headerDisplayMap = {
+                'n': 'n', 'k': 'k', 'a': 'a_n', 'b': 'b_n',
+                'c': 'c_n', 'x_n': 'x_n',
+                'f(c)': 'f(c_n)', 'f(x_n)': 'f(x_n)',
+                'phi(x_k)': '\\phi(x_k)', "f'(x_k)": "f'(x_k)",
+                'error': '\\text{Sai số}',
+            };
+            const displayHeader = headerDisplayMap[header] || header;
+            html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider"><span class="katex-header" data-header="${displayHeader}"></span></th>`;
         });
         html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
 
@@ -854,47 +862,64 @@ function displayNonlinearEquationResults(result) {
         html += `</tbody></table></div></div>`;
     }
     
-    // Chèn toàn bộ HTML đã tạo vào trang
     resultsArea.innerHTML = html;
 
-    // === BƯỚC 2: SỬA LỖI JAVASCRIPT ===
-    // Thêm đoạn code render LaTeX cho m1 và M1
-
-    // Render cho điều kiện hội tụ (nếu có)
-    if (result.hasOwnProperty('m1') && result.hasOwnProperty('M1')) {
-        const m1_container = document.getElementById('m1-container');
-        const M1_container = document.getElementById('M1-container');
-
-        if (m1_container) {
-            // Lấy chuỗi text chứa mã LaTeX và render lại vào chính nó
-            katex.render(m1_container.textContent, m1_container, { throwOnError: false, displayMode: false });
-        }
-        if (M1_container) {
-            katex.render(M1_container.textContent, M1_container, { throwOnError: false, displayMode: false });
-        }
-    }
-
-    // Render cho tiêu đề bảng (nếu có)
-    if (result.steps && result.steps.length > 0) {
-        const headersForKatex = Object.keys(result.steps[0]);
-        const headerMap = { // Khai báo lại ở đây để sử dụng
-            'k': 'k', 'x_k': 'x_k', 'a': 'a_k', 'b': 'b_k', 'c': 'c_k',
-            'f_c': 'f(c_k)', 'x_k+1': 'x_{k+1}', 'phi(x_k)': '\\phi(x_k)',
-            'f_xk': 'f(x_k)', 'df_xk': "f'(x_k)", 'error': '\\text{Sai số}'
-        };
-        headersForKatex.forEach(header => {
-            const targetElement = document.getElementById(`header-${header}`);
-            if(targetElement) {
-                const latexHeader = headerMap[header] || header;
-                katex.render(latexHeader, targetElement, { throwOnError: false });
+    // Phần 4: Render LaTeX cho các hệ số và tiêu đề bảng
+    coeffsHtmlParts.forEach((part) => {
+        const idMatch = part.match(/id="([^"]+)"/);
+        if (idMatch) {
+            const element = document.getElementById(idMatch[1]);
+            if (element) {
+                katex.render(element.textContent, element, { throwOnError: false, displayMode: false });
             }
-        });
-    }
+        }
+    });
+
+    document.querySelectorAll('.katex-header').forEach(element => {
+        const latexString = element.getAttribute('data-header');
+        katex.render(latexString, element, { throwOnError: false });
+    });
 }
 // ===============================================
 // === END: CODE MỚI
 // ===============================================
+function displayEigenPowerResults(result) {
+    let html = '';
+    if (result.success) {
+        html += `<div class="result-success">
+                    <p class="font-semibold">Phép tính thành công!</p>
+                    <p>Trị riêng trội: <span class="font-mono">${formatNumber(result.eigenvalue)}</span></p>
+                    <p>Vector riêng tương ứng:</p>
+                    <div class="font-mono">${formatMatrix(result.eigenvector, 'v')}</div>
+                 </div>`;
 
+        if (result.steps && result.steps.length > 0) {
+            html += `<div class="mt-4">
+                        <h3 class="result-heading">Bảng Các Bước Lặp</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">k</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">y_k</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">μ_k</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+            result.steps.forEach(step => {
+                html += `<tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${step.k}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatMatrix(step.y_k, 'y')}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(step.mu_k)}</td>
+                         </tr>`;
+            });
+            html += `</tbody></table></div></div>`;
+        }
+    } else {
+        html = `<div class="result-error">Lỗi: ${result.error}</div>`;
+    }
+    return html;
+}
 // --- START: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
 function displayInverseResults(result, method) {
     const resultsArea = document.getElementById('results-area');

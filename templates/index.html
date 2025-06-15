@@ -318,11 +318,17 @@ sidebarToggle.addEventListener('click', () => {
         </div>
         
         <div id="advanced-stop-condition-group" style="display:none;">
-            <label for="advanced-stop-select" class="block text-sm font-medium text-gray-700">Công thức sai số</label>
-            <select id="advanced-stop-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
-                <option value="f_xn">Dựa trên |f(xₙ)|</option>
-                <option value="xn_xn-1">Dựa trên |xₙ - xₙ₋₁|</option>
-            </select>
+            <label class="block text-sm font-medium text-gray-700">Công thức đánh giá sai số</label>
+            <div class="mt-2 space-y-3 p-3 bg-gray-50 rounded-md">
+                <div class="flex items-center">
+                    <input id="adv-stop-radio-1" name="advanced-stop-option" type="radio" value="f_xn" checked class="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500">
+                    <label for="adv-stop-radio-1" class="ml-3 block text-lg font-medium text-gray-800" id="adv-stop-label-1"></label>
+                </div>
+                <div class="flex items-center">
+                    <input id="adv-stop-radio-2" name="advanced-stop-option" type="radio" value="xn_x_prev" class="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500">
+                    <label for="adv-stop-radio-2" class="ml-3 block text-lg font-medium text-gray-800" id="adv-stop-label-2"></label>
+                </div>
+            </div>
         </div>
     </div>
     

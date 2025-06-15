@@ -4,93 +4,97 @@ import numpy as np
 def solve_secant(parsed_expr, a, b, mode, value, stop_condition):
     """
     Giải phương trình f(x) = 0 bằng phương pháp Dây cung (Secant).
+    Đã sửa lỗi logic điều kiện dừng.
     """
     f = parsed_expr['f']
     f_prime = parsed_expr['f_prime']
     f_double_prime = parsed_expr['f_double_prime']
     steps = []
 
-    # Kiểm tra điều kiện hội tụ tại nhiều điểm trên [a, b]
-    N_check = 20
-    x_check = np.linspace(a, b, N_check)
-    h = 1e-6
-    fp_signs = []
-    fpp_signs = []
-    for x in x_check:
-        try:
-            fp = f_prime(x) if f_prime else (f(x + h) - f(x - h)) / (2 * h)
-            fpp = f_double_prime(x) if f_double_prime else (f(x + h) - 2*f(x) + f(x - h)) / (h**2)
-            fp_signs.append(np.sign(fp))
-            fpp_signs.append(np.sign(fpp))
-        except Exception:
-            fp_signs.append(0)
-            fpp_signs.append(0)
-    # Loại bỏ các điểm đạo hàm gần 0
-    fp_signs = [s for s in fp_signs if abs(s) > 1e-8]
-    fpp_signs = [s for s in fpp_signs if abs(s) > 1e-8]
-    monotonic_fp = all(s > 0 for s in fp_signs) or all(s < 0 for s in fp_signs)
-    monotonic_fpp = all(s > 0 for s in fpp_signs) or all(s < 0 for s in fpp_signs)
-    monotonic_warning = None
-    if not monotonic_fp or not monotonic_fpp:
-        monotonic_warning = f"Cảnh báo: f'(x) hoặc f''(x) có thể đổi dấu trên [{a}, {b}]. Phương pháp dây cung chỉ đảm bảo hội tụ nếu f'(x), f''(x) liên tục và không đổi dấu."
-
-    # 1. Kiểm tra điều kiện hội tụ tại hai đầu mút
+    # 1. Kiểm tra điều kiện f(a)f(b) < 0
     if f(a) * f(b) >= 0:
         return {"success": False, "error": "Điều kiện f(a) * f(b) < 0 không thỏa mãn."}
-    if f_prime(a) * f_prime(b) <= 0 or f_double_prime(a) * f_double_prime(b) <= 0:
-        return {"success": False, "error": "Điều kiện hội tụ f'(x) và f''(x) không đổi dấu trên [a, b] không thỏa mãn."}
+
+    # 2. Kiểm tra tính đơn điệu của f' và f''
+    try:
+        x_check = np.linspace(a, b, 20)
+        fp_signs = np.sign([f_prime(x) for x in x_check])
+        fpp_signs = np.sign([f_double_prime(x) for x in x_check])
+        if np.any(fp_signs == 0) or np.any(fpp_signs == 0):
+             return {"success": False, "error": "Đạo hàm f'(x) hoặc f''(x) bằng 0 bên trong khoảng."}
+        if len(set(fp_signs)) > 1 or len(set(fpp_signs)) > 1:
+            return {"success": False, "error": "Điều kiện hội tụ f'(x) và f''(x) không đổi dấu trên [a, b] không thỏa mãn."}
+    except Exception as e:
+        return {"success": False, "error": f"Không thể kiểm tra đạo hàm trên khoảng [a, b]. Lỗi: {e}"}
         
-    # 2. Chọn điểm cố định d và điểm lặp x0
+    # 3. Chọn điểm cố định d (điểm Fourier) và điểm lặp x0
     if f(a) * f_double_prime(a) > 0:
-        d = a  # Điểm Fourier
-        x0 = b
+        d, x0 = a, b
     elif f(b) * f_double_prime(b) > 0:
-        d = b  # Điểm Fourier
-        x0 = a
+        d, x0 = b, a
     else:
         return {"success": False, "error": "Không tìm thấy điểm Fourier để làm điểm cố định."}
 
-    # 3. Tính hằng số
-    m1 = min(np.abs(f_prime(a)), np.abs(f_prime(b)))
-    M1 = max(np.abs(f_prime(a)), np.abs(f_prime(b)))
-    if m1 == 0:
-        return {"success": False, "error": "Đạo hàm f'(x) bằng 0 tại biên."}
+    # 4. Tính các hằng số m1, M1
+    try:
+        x_range = np.linspace(a, b, 1000)
+        f_prime_values = np.abs([f_prime(x) for x in x_range])
+        m1 = np.min(f_prime_values)
+        M1 = np.max(f_prime_values)
+        if m1 < 1e-12:
+            return {"success": False, "error": "Đạo hàm f'(x) có giá trị gần bằng 0 trong khoảng, không đảm bảo công thức sai số."}
+    except Exception as e:
+        return {"success": False, "error": f"Không thể tính m1, M1 trên khoảng [a, b]. Lỗi: {e}"}
 
     x_curr = x0
+    iterations_to_run = int(value) if mode == 'iterations' else 200
     
-    for i in range(200):
+    for i in range(iterations_to_run):
         f_curr = f(x_curr)
         f_d = f(d)
         
         step_info = {"n": i, "x_n": x_curr, "f(x_n)": f_curr}
-
+        
+        # Cập nhật x_next
+        x_prev = x_curr
+        denominator = f_curr - f_d
+        if abs(denominator) < 1e-12:
+            return {"success": False, "error": "Mẫu số f(x_n) - f(d) bằng 0.", "steps": steps}
+        x_curr = x_curr - (f_curr * (x_curr - d)) / denominator
+        
         # Kiểm tra điều kiện dừng
         done = False
-        if mode == 'iterations' and i >= int(value):
-            done = True
+        tol = float(value)
+        
+        if mode == 'iterations':
+            if i + 1 >= tol:
+                done = True
         elif mode == 'absolute_error':
             if stop_condition == 'f_xn':
                 error = np.abs(f_curr) / m1
                 step_info['|f(x_n)|/m1'] = error
-                if error <= value: done = True
+                if error < tol: done = True
             else: # xn_xn-1
-                # Với i=0, x_prev là d. Cho các lần sau, x_prev chính là d.
-                x_prev_for_error = d if i == 0 else steps[-1]['x_n']
-                error = ((M1 - m1) / m1) * np.abs(x_curr - x_prev_for_error)
-                step_info['(M1-m1)|x_n-d|/m1'] = error
-                if error <= value: done = True
+                error = ((M1 - m1) / m1) * np.abs(x_curr - x_prev)
+                step_info['(M1-m1)|x_n-x_{n-1}|/m1'] = error
+                if error < tol: done = True
+        elif mode == 'relative_error':
+            if abs(x_curr) < 1e-12: # Tránh chia cho 0
+                done = False
+            elif stop_condition == 'f_xn':
+                error = np.abs(f_curr) / (m1 * np.abs(x_curr))
+                step_info['|f(x_n)|/(m1|x_n|)'] = error
+                if error < tol: done = True
+            else: # xn_xn-1
+                error = ((M1 - m1) / m1) * np.abs(x_curr - x_prev) / np.abs(x_curr)
+                step_info['(M1-m1)|x_n-x_{n-1}|/(m1|x_n|)'] = error
+                if error < tol: done = True
         
         steps.append(step_info)
         if done:
             break
 
-        # Cập nhật x_curr
-        denominator = f_curr - f_d
-        if denominator == 0:
-            return {"success": False, "error": "Mẫu số f(x_n) - f(d) bằng 0."}
-        
-        x_curr = x_curr - (f_curr * (x_curr - d)) / denominator
-    else:
-        return {"success": False, "error": "Không hội tụ sau 200 lần lặp."}
+    if mode != 'iterations' and not done:
+        return {"success": False, "error": f"Không hội tụ sau {iterations_to_run} lần lặp.", "steps": steps}
 
-    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps), "warning": monotonic_warning}
+    return {"success": True, "solution": x_curr, "steps": steps, "iterations": len(steps), "m1": m1, "M1": M1}
