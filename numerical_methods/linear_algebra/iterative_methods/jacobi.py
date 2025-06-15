@@ -28,22 +28,22 @@ def solve_jacobi(matrix_a, matrix_b, x0, eps=1e-5, max_iter=100):
         # Tách A = D - R
         D = np.diag(np.diag(matrix_a))
         R = D - matrix_a
-        inv_D = np.diag(1.0 / np.diag(matrix_a))
+        T = np.diag(1.0 / np.diag(matrix_a))
         
         # Ma trận lặp T = D⁻¹R và vector c = D⁻¹b
-        T = inv_D @ R
-        c = inv_D @ matrix_b
+        B = T @ R
+        d = T @ matrix_b
 
         steps.append({
-            "message": "Thiết lập công thức lặp Xₖ₊₁ = T·Xₖ + c",
-            "T": T.tolist(),
-            "c": c.tolist()
+            "message": "Thiết lập công thức lặp Xₖ₊₁ = B·Xₖ + d",
+            "B": B.tolist(),
+            "d": d.tolist()
         })
         
         table_rows = []
 
         for i in range(max_iter):
-            x_k_plus_1 = T @ x_k + c
+            x_k_plus_1 = B @ x_k + d
             
             error = np.linalg.norm(x_k_plus_1 - x_k, np.inf)
             

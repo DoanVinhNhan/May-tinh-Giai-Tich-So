@@ -139,4 +139,3 @@ def calculate_svd(A, method='default', **kwargs):
         return svd_power_deflation(A, num_singular=num_singular, num_iter=num_iter, tol=tol, y_init=y_init)
     else:
         return svd_numpy(A)
-

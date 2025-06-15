@@ -1631,10 +1631,10 @@ function displayIterativeHptResults(result, method) {
                     </tr>`;
                 });
                 html += `</tbody></table></div></div>`;
-            } else { // Đây là các ma trận T, c
+            } else { // Đây là các ma trận B, d
                 html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-                if(step.T) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp T:</span><div class="matrix-display">${formatMatrix(step.T)}</div></div>`;
-                if(step.c) html += `<div class="mt-2"><span class="font-semibold">Vector c:</span><div class="matrix-display">${formatMatrix(step.c)}</div></div>`;
+                if(step.B) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp B:</span><div class="matrix-display">${formatMatrix(step.B)}</div></div>`;
+                if(step.d) html += `<div class="mt-2"><span class="font-semibold">Vector d:</span><div class="matrix-display">${formatMatrix(step.d)}</div></div>`;
                 html += `</div>`;
             }
         });
