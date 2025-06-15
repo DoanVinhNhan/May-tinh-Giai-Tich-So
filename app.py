@@ -18,6 +18,8 @@ from numerical_methods.linear_algebra.inverse.cholesky_inverse import solve_inve
 from numerical_methods.linear_algebra.inverse.bordering import solve_inverse_bordering
 from numerical_methods.linear_algebra.inverse.jacobi_inverse import solve_inverse_jacobi
 from numerical_methods.linear_algebra.inverse.newton_inverse import solve_inverse_newton
+from numerical_methods.linear_algebra.inverse.gauss_seidel_inverse import solve_inverse_gauss_seidel
+
 # --- END: IMPORT MỚI ---
 
 # --- Import các phương thức của Giải phương trình f(x)=0 ---
@@ -38,6 +40,7 @@ from numerical_methods.linear_algebra.iterative_methods.gauss_seidel import solv
 from numerical_methods.root_finding.polynomial_root_finding import solve_polynomial
 
 from numerical_methods.linear_algebra.eigen.power_method import power_iteration_deflation
+from numerical_methods.linear_algebra.iterative_methods.simple_iteration import solve_simple_iteration as solve_simple_iteration_hpt
 
 
 
@@ -105,6 +108,30 @@ def inverse_solver(solver_function):
         print("Lỗi khi xử lý request nghịch đảo:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 # --- END: HELPER MỚI ---
+def iterative_hpt_solver_simple_iteration(solver_function):
+    data = request.get_json()
+    if not data or 'matrix_b' not in data or 'matrix_d' not in data or 'x0' not in data:
+        return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu ma trận B, d hoặc vector X₀."}), 400
+    try:
+        matrix_B = np.array(data['matrix_b'], dtype=float)
+        matrix_d = np.array(data['matrix_d'], dtype=float)
+        x0 = np.array(data['x0'], dtype=float)
+        
+        eps = float(data.get('tolerance', 1e-5))
+        max_iter = int(data.get('max_iter', 100))
+        # START: LẤY LỰA CHỌN CHUẨN TỪ REQUEST
+        norm_choice = data.get('norm_choice', 'inf') 
+        # END: LẤY LỰA CHỌN
+            
+        # START: TRUYỀN LỰA CHỌN VÀO HÀM SOLVER
+        result = solver_function(matrix_B, matrix_d, x0, eps=eps, max_iter=max_iter, norm_choice=norm_choice)
+        # END: TRUYỀN LỰA CHỌN
+        
+        result['success'] = True if 'error' not in result else False
+        return jsonify(result)
+    except Exception as e:
+        print("Lỗi khi xử lý request HPT lặp đơn:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
 
 @app.route('/matrix/iterative/jacobi', methods=['POST'])
@@ -180,6 +207,10 @@ def handle_danilevsky():
 def handle_inverse_gauss_jordan():
     return inverse_solver(solve_inverse_gauss_jordan)
 
+@app.route('/matrix/iterative/simple-iteration', methods=['POST'])
+def handle_iterative_simple_iteration():
+    return iterative_hpt_solver_simple_iteration(solve_simple_iteration_hpt)
+
 @app.route('/matrix/inverse/lu', methods=['POST'])
 def handle_inverse_lu():
     return inverse_solver(solve_inverse_lu)
@@ -199,6 +230,10 @@ def handle_inverse_jacobi():
 @app.route('/matrix/inverse/newton', methods=['POST'])
 def handle_inverse_newton():
     return inverse_solver(solve_inverse_newton)
+
+@app.route('/matrix/inverse/gauss-seidel', methods=['POST'])
+def handle_inverse_gauss_seidel():
+    return inverse_solver(solve_inverse_gauss_seidel)
 # --- END: CÁC ENDPOINT MỚI ---
 
 @app.route('/nonlinear-equation/solve', methods=['POST'])
