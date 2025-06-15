@@ -884,41 +884,96 @@ function displayNonlinearEquationResults(result) {
 // === END: CODE MỚI
 // ===============================================
 function displayEigenPowerResults(result) {
-    let html = '';
-    if (result.success) {
-        html += `<div class="result-success">
-                    <p class="font-semibold">Phép tính thành công!</p>
-                    <p>Trị riêng trội: <span class="font-mono">${formatNumber(result.eigenvalue)}</span></p>
-                    <p>Vector riêng tương ứng:</p>
-                    <div class="font-mono">${formatMatrix(result.eigenvector, 'v')}</div>
-                 </div>`;
+    const resultsArea = document.getElementById('results-area');
+    let html = `<h3 class="result-heading">Kết Quả Phương Pháp Luỹ Thừa</h3>`;
 
-        if (result.steps && result.steps.length > 0) {
-            html += `<div class="mt-4">
-                        <h3 class="result-heading">Bảng Các Bước Lặp</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">k</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">y_k</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">μ_k</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">`;
-            result.steps.forEach(step => {
-                html += `<tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${step.k}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatMatrix(step.y_k, 'y')}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(step.mu_k)}</td>
+    if (result.message) {
+        html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-green-50 rounded-lg shadow-inner">${result.message}</div>`;
+    }
+    
+    // Hiển thị cảnh báo nếu có
+    if (result.warnings && result.warnings.length > 0) {
+        result.warnings.forEach(warning => {
+            html += `<div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">${warning}</div>`;
+        });
+    }
+
+    // Hiển thị kết quả tóm tắt
+    if (result.eigenvalues && result.eigenvectors) {
+        html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
+                    <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Kết quả tìm được</h4>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium text-gray-600">#</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-600">Giá trị riêng (λ)</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-600">Vector riêng tương ứng (v)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">`;
+        result.eigenvalues.forEach((val, i) => {
+            const vec = result.eigenvectors[i].map(v => [v]); // Chuyển thành vector cột để hiển thị
+            html += `<tr>
+                        <td class="px-4 py-2 font-mono">${i + 1}</td>
+                        <td class="px-4 py-2 font-mono text-indigo-700 font-semibold">${formatNumber(val)}</td>
+                        <td class="px-4 py-2 font-mono">${formatMatrix(vec)}</td>
+                     </tr>`;
+        });
+        html += `   </tbody>
+                    </table>
+                 </div>`;
+    }
+
+    // Hiển thị các bước chi tiết
+    if (result.steps && result.steps.length > 0) {
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Lặp Chi Tiết</h3><div class="space-y-8">`;
+        
+        result.steps.forEach(step => {
+            html += `<div class="p-4 border border-blue-200 rounded-lg bg-blue-50/50">
+                        <h4 class="font-semibold text-blue-800 text-xl">Tìm giá trị riêng thứ ${step.eigenvalue_index}</h4>
+                        <p class="text-sm text-gray-600">Ma trận hiện tại A<sub>${step.eigenvalue_index - 1}</sub>:</p>
+                        <div class="matrix-display">${formatMatrix(step.matrix_before_deflation)}</div>
+                        
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800">Xem các bước lặp Power Iteration</summary>
+                            <div class="overflow-x-auto mt-2">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-gray-100"><tr>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">xₖ</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">A·xₖ</th>
+                                        <th class="px-4 py-2 text-left font-medium text-gray-600">λₖ</th>
+                                    </tr></thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">`;
+            step.iteration_details.forEach(iter => {
+                 html += `<tr>
+                            <td class="px-4 py-2 font-mono">${iter.k}</td>
+                            <td class="px-4 py-2 font-mono">[${iter.x_k.map(v=>formatNumber(v,3)).join(', ')}]</td>
+                            <td class="px-4 py-2 font-mono">[${iter.Ax_k.map(v=>formatNumber(v,3)).join(', ')}]</td>
+                            <td class="px-4 py-2 font-mono text-blue-700 font-semibold">${formatNumber(iter.lambda_k)}</td>
                          </tr>`;
             });
-            html += `</tbody></table></div></div>`;
-        }
-    } else {
-        html = `<div class="result-error">Lỗi: ${result.error}</div>`;
+            html += `</tbody></table></div></details>
+            
+            <div class="mt-4 p-3 bg-green-100 rounded-md">
+                <p class="font-medium text-green-800">Kết quả của bước này:</p>
+                <p class="font-mono">λ<sub>${step.eigenvalue_index}</sub> ≈ ${formatNumber(step.iteration_summary.found_eigenvalue)}</p>
+                <p class="font-mono">v<sub>${step.eigenvalue_index}</sub> ≈ [${step.iteration_summary.found_eigenvector.map(v=>formatNumber(v)).join(', ')}]</p>
+            </div>
+            
+            ${ (step.eigenvalue_index < result.eigenvalues.length) ? 
+               `<div class="mt-4">
+                    <p class="text-sm text-gray-600">Ma trận sau khi xuống thang A<sub>${step.eigenvalue_index}</sub> = A<sub>${step.eigenvalue_index - 1}</sub> - λ₁v₁v₁ᵀ:</p>
+                    <div class="matrix-display">${formatMatrix(result.steps[step.eigenvalue_index].matrix_before_deflation)}</div>
+                </div>` : ''
+            }
+            </div>`;
+        });
+        
+        html += `</div></div>`;
     }
-    return html;
+
+    resultsArea.innerHTML = html;
 }
 // --- START: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
 function displayInverseResults(result, method) {
