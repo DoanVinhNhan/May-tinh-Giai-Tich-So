@@ -1174,7 +1174,56 @@ function displayDanilevskyResults(result) {
                      <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Vector riêng tương ứng (các cột):</h4>
                      <div class="matrix-display">${formattedEigenvectors}</div>
                  </div>`;
+        
+        if (result.char_poly && result.char_poly.length > 0) {
+            let polyString = 'P(λ) = ';
+            const coeffs = result.char_poly;
+            const n = coeffs.length - 1;
 
+            for (let i = 0; i < coeffs.length; i++) {
+                // SỬA LỖI: Lấy hệ số trực tiếp, không qua ".real"
+                // Đồng thời kiểm tra xem nó có phải là object không để đảm bảo tương thích
+                let coeff_val = coeffs[i];
+                if (typeof coeff_val === 'object' && coeff_val !== null && coeff_val.hasOwnProperty('re')) {
+                    coeff_val = coeff_val.re;
+                }
+
+                // Nếu sau khi lấy giá trị mà vẫn không phải là số thì bỏ qua
+                if (isNaN(coeff_val)) continue;
+                if (Math.abs(coeff_val) < zeroTolerance) continue;
+
+                let power = n - i;
+
+                if (i > 0) {
+                    polyString += (coeff_val > 0) ? ' + ' : ' - ';
+                    coeff_val = Math.abs(coeff_val);
+                } else if (coeff_val < 0) {
+                    polyString += '-';
+                    coeff_val = Math.abs(coeff_val);
+                }
+
+                const formattedCoeff = formatNumber(coeff_val);
+                if (formattedCoeff !== '1' || power === 0) {
+                     polyString += formattedCoeff;
+                }
+                
+                if (power > 0) {
+                    polyString += 'λ';
+                    if (power > 1) {
+                        polyString += `<sup>${power}</sup>`;
+                    }
+                }
+            }
+            
+            html += `
+                <div class="mt-8 border-t pt-6">
+                    <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Đa thức đặc trưng:</h4>
+                    <div class="matrix-display text-center text-xl font-mono !bg-indigo-50 !text-indigo-800">
+                        ${polyString}
+                    </div>
+                </div>
+            `;
+        }
 
         if (result.steps && result.steps.length > 0) {
             html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
