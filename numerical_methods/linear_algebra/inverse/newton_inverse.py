@@ -1,3 +1,4 @@
+# doanvinhnhan/may-tinh-giai-tich-so/May-tinh-Giai-Tich-So-main/numerical_methods/linear_algebra/inverse/newton_inverse.py
 import numpy as np
 
 def solve_inverse_newton(A, eps=1e-5, max_iter=100, x0_method='auto', **kwargs):
@@ -50,33 +51,29 @@ def solve_inverse_newton(A, eps=1e-5, max_iter=100, x0_method='auto', **kwargs):
             "matrix": X_k.tolist()
         })
 
-        table_rows = []
+        iteration_details = []
         
         for i in range(max_iter):
             X_k_plus_1 = X_k @ (2 * E - A @ X_k)
             
             error = np.linalg.norm(X_k_plus_1 - X_k, 'fro')
             
-            if i < 5 or i > max_iter - 5 or error <= eps:
-                 table_rows.append([
-                    str(i+1),
-                    f"{X_k_plus_1[0,0]:.6f}, ...",
-                    f"{error:.6e}"
-                ])
-            elif i == 5:
-                 table_rows.append(["...", "...", "..."])
+            # Ghi lại ma trận X và sai số của bước lặp này
+            iteration_details.append({
+                "iteration_number": i + 1,
+                "matrix_Xk": X_k_plus_1.tolist(),
+                "error_fro": error
+            })
 
             if error < eps:
                 break
                 
             X_k = X_k_plus_1
-
+        
+        # Đưa các bước lặp chi tiết vào kết quả trả về
         steps.append({
-            "message": "Bảng quá trình lặp",
-            "table": {
-                "headers": ["Lần lặp k", "Xₖ (ví dụ)", "||Xₖ - Xₖ₋₁||_fro"],
-                "rows": table_rows
-            }
+            "message": "Quá trình lặp:",
+            "iterations": iteration_details
         })
         
         inv_A = X_k_plus_1

@@ -941,23 +941,52 @@ function displayInverseResults(result, method) {
         html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
         result.steps.forEach(step => {
             html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-            // Hiển thị ma trận nếu có
+            
             if (step.matrix) {
                  html += `<div class="matrix-display">${formatMatrix(step.matrix)}</div>`;
             }
-            // Hiển thị các ma trận L, U, P, v.v.
+            
+            // === THAY ĐỔI TẠI ĐÂY ===
+            // 1. Xử lý các tham số thông thường
             ['L', 'U', 'P', 'M', 'inv_M', 'theta'].forEach(key => {
                 if (step[key] !== undefined) {
-                    html += `<div class="mt-2"><span class="font-semibold">${key}:</span>`;
-                    if (Array.isArray(step[key])) { // Là ma trận
+                    let labelHtml = `<span class="font-semibold">${key}:</span>`;
+                    html += `<div class="mt-2">${labelHtml}`;
+                    if (Array.isArray(step[key])) { 
                         html += `<div class="matrix-display">${formatMatrix(step[key])}</div>`;
-                    } else { // Là giá trị
-                        html += ` <span class="font-mono">${formatNumber(step[key])}</span>`;
+                    } else { 
+                        html += ` <span class="font-mono"> ${formatNumber(step[key])}</span>`;
                     }
                     html += `</div>`;
                 }
             });
-            // Hiển thị bảng lặp cho Jacobi/Newton
+
+            // 2. Xử lý riêng tham số 'q' để làm nổi bật
+            if (step.q !== undefined) {
+                html += `<div class="mt-4 p-4 bg-indigo-50 rounded-lg text-center border border-indigo-200 shadow-sm">
+                             <p class="text-sm font-medium text-indigo-800 mb-2">Điều kiện hội tụ</p>
+                             <div class="text-xl md:text-2xl" id="q-prominent-block"></div>
+                         </div>`;
+            }
+            
+            if (step.iterations) {
+                html += `<div class="space-y-6 mt-4">`;
+                step.iterations.forEach(iter_step => {
+                    html += `<div class="p-4 border rounded-lg bg-gray-50/50">
+                                <p class="font-semibold text-gray-800">Bước lặp ${iter_step.iteration_number}</p>
+                                <div class="mt-2">
+                                    <p class="font-medium text-sm text-gray-600">Ma trận X<sub>${iter_step.iteration_number}</sub>:</p>
+                                    <div class="matrix-display">${formatMatrix(iter_step.matrix_Xk)}</div>
+                                </div>
+                                <div class="mt-2">
+                                    <p class="font-medium text-sm text-gray-600">Sai số:</p>
+                                    <p class="font-mono text-center bg-gray-100 p-2 rounded-md">||Xₖ - Xₖ₋₁||_fro ≈ ${formatNumber(iter_step.error_fro, 8)}</p>
+                                </div>
+                             </div>`;
+                });
+                html += `</div>`;
+            }
+            
             if (step.table) {
                 html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
@@ -980,6 +1009,32 @@ function displayInverseResults(result, method) {
         html += `</div></div>`;
     }
     resultsArea.innerHTML = html;
+
+    // === THAY ĐỔI TẠI ĐÂY ===
+    // 3. Tìm khối nổi bật và render KaTeX vào đó
+    const qProminentBlock = document.getElementById('q-prominent-block');
+    // Giá trị 'q' nằm trong bước đầu tiên của kết quả
+    const qValue = result.steps && result.steps[0] ? result.steps[0].q : undefined;
+
+    if (qProminentBlock && qValue !== undefined && window.katex) {
+        const qValueFormatted = formatNumber(qValue, 6);
+        const latexString = String.raw`||I - AX_0||_2 \approx ${qValueFormatted}`;
+        try {
+            katex.render(latexString, qProminentBlock, {
+                throwOnError: false,
+                displayMode: true
+            });
+            // Thêm một thông báo nhỏ để giải thích ý nghĩa của giá trị q
+            if (qValue < 1) {
+                qProminentBlock.insertAdjacentHTML('afterend', '<p class="text-xs text-green-700 mt-2">✓ Điều kiện hội tụ được thỏa mãn (giá trị < 1).</p>');
+            } else {
+                 qProminentBlock.insertAdjacentHTML('afterend', '<p class="text-xs text-red-600 mt-2">✗ CẢNH BÁO: Điều kiện hội tụ không được thỏa mãn (giá trị ≥ 1).</p>');
+            }
+        } catch (e) {
+            console.error("Lỗi render KaTeX cho khối 'q':", e);
+            qProminentBlock.textContent = `||I - AX_0||_2 ≈ ${qValueFormatted}`;
+        }
+    }
 }
 // --- END: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
 
