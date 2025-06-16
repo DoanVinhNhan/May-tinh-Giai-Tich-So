@@ -114,3 +114,31 @@ body {
 .matrix-table td {
     padding: 0.3rem 0.6rem;
 }
+
+.hidden {
+    display: none;
+}
+.iteration-row-hidden {
+    display: none;
+}
+
+/* Định dạng cho hàng chứa nút bấm */
+.toggle-row {
+    background-color: #f9fafb; /* Light gray background */
+}
+
+/* Định dạng cho nút bấm "Xem thêm / Ẩn bớt" */
+.toggle-table-btn {
+    background: none;
+    border: none;
+    color: #2563eb; /* Blue text color */
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.875rem; /* 14px */
+    padding: 8px;
+    font-weight: 500;
+}
+
+.toggle-table-btn:hover {
+    color: #1d4ed8; /* Darker blue on hover */
+}

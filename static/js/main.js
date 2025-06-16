@@ -62,7 +62,7 @@ function setupDisplaySettingsEvents() {
 
 // Hàm trợ giúp để tạo bảng
 function createIterativeTable(rows, headers) {
-    let table = `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+    let table = `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
     headers.forEach(h => table += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">${h}</th>`);
     table += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
@@ -114,7 +114,7 @@ function latexToPython(latex) {
 }
 function formatLatexMatrix(data) {
     if (!Array.isArray(data) || !Array.isArray(data[0])) return '';
-    let tableHtml = '<table class="matrix-table">';
+    let tableHtml = '<table class=" collapsible-table matrix-table">';
     data.forEach(row => {
         tableHtml += '<tr>';
         row.forEach(cell => {
@@ -226,7 +226,7 @@ function formatMatrix(data, precision = displayPrecision) {
     if (!Array.isArray(data) || !Array.isArray(data[0])) return '';
 
     // --- Phần tạo bảng HTML cho ma trận (giữ nguyên) ---
-    let tableHtml = '<table class="matrix-table">';
+    let tableHtml = '<table class=" collapsible-table matrix-table">';
     data.forEach(row => {
         tableHtml += '<tr>';
         row.forEach(cell => {
@@ -257,6 +257,67 @@ function formatMatrix(data, precision = displayPrecision) {
     // 'group' để hiệu ứng group-hover hoạt động, 'relative' để định vị nút con 'absolute'
     return `<div class="group relative inline-block">${copyButtonHtml}${tableHtml}</div>`;
 }
+
+/**
+ * Tự động tìm tất cả các bảng có class 'collapsible-table',
+ * ẩn các hàng ở giữa và thêm nút "Xem thêm / Ẩn bớt".
+ * @param {number} headRows - Số hàng đầu tiên luôn hiển thị.
+ * @param {number} tailRows - Số hàng cuối cùng luôn hiển thị.
+ */
+function setupCollapsibleTables(headRows = 3, tailRows = 2) {
+    document.querySelectorAll('.collapsible-table').forEach(table => {
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const totalRows = rows.length;
+        const MIN_ROWS_TO_COLLAPSE = headRows + tailRows + 2; // Chỉ thu gọn nếu có đủ hàng
+
+        if (totalRows > MIN_ROWS_TO_COLLAPSE) {
+            // Ẩn các hàng ở giữa
+            for (let i = headRows; i < totalRows - tailRows; i++) {
+                rows[i].classList.add('iteration-row-hidden');
+            }
+
+            // Tạo và chèn hàng chứa nút "Xem thêm"
+            const toggleRow = document.createElement('tr');
+            toggleRow.classList.add('toggle-row');
+            const toggleCell = document.createElement('td');
+            toggleCell.colSpan = rows[0] ? rows[0].cells.length : 1; // Nút sẽ chiếm toàn bộ chiều rộng bảng
+            toggleCell.style.textAlign = 'center';
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.classList.add('toggle-table-btn');
+            
+            const hiddenRowCount = totalRows - headRows - tailRows;
+            toggleBtn.textContent = `... (Xem thêm...`;
+            toggleBtn.dataset.state = 'collapsed'; // Trạng thái ban đầu
+
+            toggleCell.appendChild(toggleBtn);
+            toggleRow.appendChild(toggleCell);
+
+            // Chèn hàng có nút bấm vào sau hàng cuối cùng của phần đầu
+            rows[headRows - 1].after(toggleRow);
+
+            // Thêm sự kiện click cho nút
+            toggleBtn.addEventListener('click', () => {
+                const isCollapsed = toggleBtn.dataset.state === 'collapsed';
+                for (let i = headRows; i < totalRows - tailRows; i++) {
+                    rows[i].classList.toggle('iteration-row-hidden');
+                }
+                
+                if (isCollapsed) {
+                    toggleBtn.textContent = 'Ẩn bớt';
+                    toggleBtn.dataset.state = 'expanded';
+                } else {
+                    toggleBtn.textContent = `... (Xem thêm ${hiddenRowCount} dòng) ...`;
+                    toggleBtn.dataset.state = 'collapsed';
+                }
+            });
+        }
+    });
+}
+
 function attachCopyMatrixEvents() {
     const copyButtons = document.querySelectorAll('.copy-matrix-btn');
 
@@ -417,6 +478,7 @@ function wrapDisplay(fn) {
         window.lastResult = result;
         window.lastDisplayFn = fn;
         fn(result, method);
+        setupCollapsibleTables();
     };
 }
 
@@ -924,7 +986,7 @@ function displayNonlinearEquationResults(result) {
             return a.localeCompare(b);
         });
         
-        html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+        html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
         
         headers.forEach(header => {
@@ -988,11 +1050,11 @@ function displayEigenPowerResults(result) {
         });
     }
 
-    // Hiển thị kết quả tóm tắt
+    // Phần 1: Hiển thị bảng kết quả tóm tắt cuối cùng
     if (result.eigenvalues && result.eigenvectors) {
         html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
-                    <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Kết quả tìm được</h4>
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Kết quả cuối cùng</h4>
+                    <table class=" collapsible-table min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="px-4 py-2 text-left font-medium text-gray-600">#</th>
@@ -1002,11 +1064,19 @@ function displayEigenPowerResults(result) {
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
         result.eigenvalues.forEach((val, i) => {
-            const vec = result.eigenvectors[i].map(v => [v]); // Chuyển thành vector cột để hiển thị
+            // Chuyển đổi vector từ chuỗi phức thành mảng số phức để formatMatrix có thể xử lý
+            const vector_data = result.eigenvectors[i].map(v_str => {
+                 try {
+                    // Cố gắng parse chuỗi phức, ví dụ "1-2.5j"
+                    const complexVal = parseFloat(v_str.replace('j', 'j'));
+                    return isNaN(complexVal) ? v_str : complexVal;
+                 } catch(e) { return v_str; }
+            });
+            const vec_as_column = vector_data.map(v => [v]); // Chuyển thành vector cột để hiển thị
             html += `<tr>
                         <td class="px-4 py-2 font-mono">${i + 1}</td>
                         <td class="px-4 py-2 font-mono text-indigo-700 font-semibold">${formatNumber(val)}</td>
-                        <td class="px-4 py-2 font-mono">${formatMatrix(vec)}</td>
+                        <td class="px-4 py-2 font-mono">${formatMatrix(vec_as_column)}</td>
                      </tr>`;
         });
         html += `   </tbody>
@@ -1014,57 +1084,111 @@ function displayEigenPowerResults(result) {
                  </div>`;
     }
 
-    // Hiển thị các bước chi tiết
+    // Phần 2: Hiển thị các bước lặp chi tiết
     if (result.steps && result.steps.length > 0) {
-        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Lặp Chi Tiết</h3><div class="space-y-8">`;
-        
-        result.steps.forEach(step => {
-            html += `<div class="p-4 border border-blue-200 rounded-lg bg-blue-50/50">
-                        <h4 class="font-semibold text-blue-800 text-xl">Tìm giá trị riêng thứ ${step.eigenvalue_index}</h4>
-                        <p class="text-sm text-gray-600">Ma trận hiện tại A<sub>${step.eigenvalue_index - 1}</sub>:</p>
-                        <div class="matrix-display">${formatMatrix(step.matrix_before_deflation)}</div>
-                        
-                        <details class="mt-3">
-                            <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800">Xem các bước lặp Power Iteration</summary>
-                            <div class="overflow-x-auto mt-2">
-                                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead class="bg-gray-100"><tr>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">xₖ</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">A·xₖ</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">λₖ</th>
-                                    </tr></thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">`;
-            step.iteration_details.forEach(iter => {
-                 html += `<tr>
-                            <td class="px-4 py-2 font-mono">${iter.k}</td>
-                            <td class="px-4 py-2 font-mono">[${iter.x_k.map(v=>formatNumber(v,3)).join(', ')}]</td>
-                            <td class="px-4 py-2 font-mono">[${iter.Ax_k.map(v=>formatNumber(v,3)).join(', ')}]</td>
-                            <td class="px-4 py-2 font-mono text-blue-700 font-semibold">${formatNumber(iter.lambda_k)}</td>
-                         </tr>`;
-            });
-            html += `</tbody></table></div></details>
-            
-            <div class="mt-4 p-3 bg-green-100 rounded-md">
-                <p class="font-medium text-green-800">Kết quả của bước này:</p>
-                <p class="font-mono">λ<sub>${step.eigenvalue_index}</sub> ≈ ${formatNumber(step.iteration_summary.found_eigenvalue)}</p>
-                <p class="font-mono">v<sub>${step.eigenvalue_index}</sub> ≈ [${step.iteration_summary.found_eigenvector.map(v=>formatNumber(v)).join(', ')}]</p>
-            </div>
-            
-            ${ (step.eigenvalue_index < result.eigenvalues.length) ? 
-               `<div class="mt-4">
-                    <p class="text-sm text-gray-600">Ma trận sau khi xuống thang A<sub>${step.eigenvalue_index}</sub> = A<sub>${step.eigenvalue_index - 1}</sub> - λ₁v₁v₁ᵀ:</p>
-                    <div class="matrix-display">${formatMatrix(result.steps[step.eigenvalue_index].matrix_before_deflation)}</div>
-                </div>` : ''
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Lặp & Xuống Thang Chi Tiết</h3>`;
+
+        const isSimplePowerMethod = result.steps[0].hasOwnProperty('k') && !result.steps[0].hasOwnProperty('eigenvalue_index');
+
+        if (isSimplePowerMethod) {
+            // Trường hợp chỉ chạy PP Lũy thừa đơn giản, không xuống thang
+            if (result.complex_pair_details) {
+                const details = result.complex_pair_details;
+                html += `<div class="mt-10 p-4 border rounded-lg bg-gray-50/50">
+                            <h3 class="result-heading !text-xl !border-gray-300">Chi tiết tìm cặp GTR Phức</h3>
+                            <div class="space-y-4 text-sm">
+                                <p>Lấy 3 vector lặp cuối cùng (đã chuẩn hóa):</p>
+                                <ul class="list-disc list-inside ml-4 font-mono bg-gray-100 p-3 rounded">
+                                   <li><b>z₀:</b> [${details.z0.join(', ')}]</li>
+                                   <li><b>z₁ = A·z₀:</b> [${details.z1.join(', ')}]</li>
+                                   <li><b>z₂ = A·z₁:</b> [${details.z2.join(', ')}]</li>
+                                </ul>
+                                <p>Lập hệ phương trình tuyến tính <b>z₂ ≈ p·z₁ - q·z₀</b> để tìm p, q. Sử dụng 2 phương trình tại các chỉ số <b>${details.indices_used.map(i => i+1).join(', ')}</b>:</p>
+                                <div class="flex justify-center items-center flex-wrap gap-x-4">
+                                   <div class="matrix-display !inline-block" title="Ma trận M">${formatMatrix(details.matrix_M)}</div>
+                                   <span class="font-mono text-lg"> · </span>
+                                   <div class="matrix-display !inline-block" title="Vector [p, -q]"><table class=" collapsible-table matrix-table"><tr><td>p</td></tr><tr><td>-q</td></tr></table></div>
+                                   <span class="font-mono text-lg"> = </span>
+                                   <div class="matrix-display !inline-block" title="Vector b">${formatMatrix(details.vector_b.map(v => [v]))}</div>
+                                </div>
+                                <p>Giải hệ, tìm được <b>p ≈ ${details.solved_p}</b> và <b>q ≈ ${details.solved_q}</b>.</p>
+                                <p>Nghiệm của phương trình đặc trưng <b class="font-mono bg-indigo-100 text-indigo-800 px-2 py-1 rounded">${details.quadratic_equation}</b> là các giá trị riêng cần tìm.</p>
+                            </div>
+                         </div>`;
             }
-            </div>`;
-        });
-        
-        html += `</div></div>`;
+            if (result.opposite_sign_details) {
+                const details = result.opposite_sign_details;
+                html += `<div class="mt-10 p-4 border rounded-lg bg-gray-50/50">
+                            <h3 class="result-heading !text-xl !border-gray-300">Chi tiết tìm cặp GTR Đối Dấu</h3>
+                            <div class="space-y-4 text-sm">
+                                <p>Do lặp không hội tụ, ta xét ma trận <b>A' = A²</b>:</p>
+                                <div class="matrix-display">${formatMatrix(details.A_squared)}</div>
+                                <details class="mt-3 bg-white p-3 rounded border">
+                                    <summary class="cursor-pointer font-medium text-blue-600 hover:text-blue-800">Xem quá trình lặp cho A'</summary>
+                                    <div class="overflow-x-auto mt-2">`;
+                const subResult = details.A_squared_result;
+                if (subResult && subResult.steps && subResult.steps.length > 0) {
+                    html += `<table class=" collapsible-table min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left font-medium text-gray-600">k</th><th class="px-4 py-2 text-left font-medium text-gray-600">xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">A'·xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">λ'ₖ</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+                    subResult.steps.forEach(iter => { html += `<tr><td class="px-4 py-2 font-mono">${iter.k}</td><td class="px-4 py-2 font-mono">[${iter.x_k.join(', ')}]</td><td class="px-4 py-2 font-mono">[${iter.Ax_k.join(', ')}]</td><td class="px-4 py-2 font-mono text-blue-700 font-semibold">${iter.lambda_k}</td></tr>`; });
+                    html += `</tbody></table>`;
+                } else { html += `<p class="text-gray-500">Không có chi tiết bước lặp cho A'.</p>`; }
+                html += `</div></details>
+                                <p>Kết quả cho <b>A'</b>: GTR trội <b>λ' ≈ ${details.lambda_squared_found}</b> và VTR tương ứng <b>v' ≈ [${details.v_from_A2.join(', ')}]</b>.</p>
+                                <p>Các giá trị riêng của A là: <b>λ₁,₂ = ±√λ' ≈ ±${details.final_lambda1}</b>.</p>
+                                <p>Các vector riêng tương ứng của A được tính bằng:</p>
+                                <ul class="list-disc list-inside ml-4 font-mono bg-gray-100 p-3 rounded">
+                                    <li><b>v₁ = (A·v' + λ₁·v') ≈</b> [${details.v1_final.join(', ')}]</li>
+                                    <li><b>v₂ = (A·v' - λ₁·v') ≈</b> [${details.v2_final.join(', ')}]</li>
+                                </ul>
+                            </div>
+                        </div>`;
+            }
+             html += `<p class="text-center text-sm text-gray-500 mb-4">(Đây là các bước lặp cơ bản của phương pháp luỹ thừa, trước khi xét các trường hợp đặc biệt)</p>`;
+             html += `<div class="overflow-x-auto mt-2"><table class=" collapsible-table min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left font-medium text-gray-600">k</th><th class="px-4 py-2 text-left font-medium text-gray-600">xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">A·xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">λₖ</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+             result.steps.forEach(iter => { html += `<tr><td class="px-4 py-2 font-mono">${iter.k}</td><td class="px-4 py-2 font-mono">[${iter.x_k.join(', ')}]</td><td class="px-4 py-2 font-mono">[${iter.Ax_k.join(', ')}]</td><td class="px-4 py-2 font-mono text-blue-700 font-semibold">${iter.lambda_k}</td></tr>`; });
+             html += `</tbody></table></div>`;
+        } else {
+            // Trường hợp có xuống thang (logic hiển thị mới)
+            html += `<div class="space-y-8">`;
+            result.steps.forEach((step, stepIdx) => {
+                html += `<div class="p-4 border border-blue-200 rounded-lg bg-blue-50/50">
+                            <h4 class="font-semibold text-blue-800 text-xl">Bước ${step.eigenvalue_index}: Tìm giá trị riêng trội của A<sub>${step.eigenvalue_index - 1}</sub></h4>
+                            <p class="text-sm text-gray-600 mt-2">Ma trận hiện tại A<sub>${step.eigenvalue_index - 1}</sub>:</p>
+                            <div class="matrix-display">${formatMatrix(step.matrix_before_deflation)}</div>
+                            
+                            <details class="mt-3 bg-white p-3 rounded border" open>
+                                <summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900">Chi tiết quá trình lặp của Bước ${step.eigenvalue_index}</summary>
+                                <div class="mt-2 space-y-3">`;
+
+                // 'iteration_details' bây giờ là một danh sách các bước lặp nhỏ
+                const stepDetails = step.iteration_details; 
+
+                if (stepDetails && Array.isArray(stepDetails) && stepDetails.length > 0) {
+                    html += `<div class="overflow-x-auto"><h5 class="text-sm font-semibold text-gray-600 mb-1">Các bước lặp:</h5><table class=" collapsible-table min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left font-medium text-gray-600">k</th><th class="px-4 py-2 text-left font-medium text-gray-600">xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">A·xₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">λₖ</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+                    stepDetails.forEach(iter => {
+                        html += `<tr><td class="px-4 py-2 font-mono">${iter.k}</td><td class="px-4 py-2 font-mono">[${iter.x_k.map(v => formatNumber(v)).join(', ')}]</td><td class="px-4 py-2 font-mono">[${iter.Ax_k.map(v => formatNumber(v)).join(', ')}]</td><td class="px-4 py-2 font-mono text-blue-700 font-semibold">${formatNumber(iter.lambda_k)}</td></tr>`;
+                    });
+                    html += `</tbody></table></div>`;
+                }
+
+                html += `</div></details>`;
+                
+                // Hiển thị kết quả tìm được trong bước này
+                const summary = step.iteration_summary;
+                if (summary && summary.found_eigenvalue) {
+                     html += `<div class="mt-4 p-3 bg-green-100 rounded-md"><p class="font-medium text-green-800">Kết quả của Bước ${step.eigenvalue_index}:</p>`;
+                     html += `<p class="font-mono text-sm">→ Tìm được GTR ≈ <b>${formatNumber(summary.found_eigenvalue)}</b></p>`;
+                     html += `</div>`;
+                }
+                
+                html += `</div>`; // Đóng div của một bước xuống thang
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
     }
 
     resultsArea.innerHTML = html;
-
     attachCopyMatrixEvents();
 }
 // --- START: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
@@ -1135,7 +1259,7 @@ function displayInverseResults(result, method) {
             }
             
             if (step.table) {
-                html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
                 step.table.headers.forEach(header => {
                     html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">${header}</th>`;
@@ -1666,7 +1790,7 @@ function displayNonlinearSystemResults(result) {
         const headerDisplayMap = {
             'error': 'Sai số'
         }
-        html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+        html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>`;
         headers.forEach(header => {
             html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider font-mono">${headerDisplayMap[header] || header}</th>`;
@@ -1716,7 +1840,7 @@ function displayIterativeHptResults(result, method) {
         result.steps.forEach(step => {
             if (step.table) { // Đây là bảng lặp
                 html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-                html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Lần lặp k</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Nghiệm X_k</th>
@@ -1882,7 +2006,7 @@ function displayPolynomialResults(result) {
                         <details class="mt-3">
                             <summary class="cursor-pointer text-sm font-medium text-purple-600 hover:text-purple-800">Xem các bước lặp (Chia đôi)</summary>
                             <div class="overflow-x-auto mt-2">
-                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <table class=" collapsible-table min-w-full divide-y divide-gray-200 text-sm">
                                     <thead class="bg-gray-100"><tr>
                                         <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
                                         <th class="px-4 py-2 text-left font-medium text-gray-600">aₖ</th>

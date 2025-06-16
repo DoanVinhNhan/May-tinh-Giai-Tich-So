@@ -39,7 +39,7 @@ from numerical_methods.linear_algebra.iterative_methods.gauss_seidel import solv
 
 from numerical_methods.root_finding.polynomial_root_finding import solve_polynomial
 
-from numerical_methods.linear_algebra.eigen.power_method import power_iteration_deflation
+from numerical_methods.linear_algebra.eigen.power_method import power_iteration_deflation, power_method_single
 from numerical_methods.linear_algebra.iterative_methods.simple_iteration import solve_simple_iteration as solve_simple_iteration_hpt
 
 
@@ -348,8 +348,8 @@ def handle_power_single():
         tolerance = float(data.get('tolerance', 1e-6))
         max_iter = int(data.get('max_iter', 100))
         
-        # Gọi hàm với num_values=1 để chỉ tìm 1 GTR
-        result = power_iteration_deflation(matrix_a, num_values=1, tol=tolerance, max_iter=max_iter)
+        # THAY ĐỔI: Gọi hàm power_method_single thay vì power_iteration_deflation
+        result = power_method_single(matrix_a, tol=tolerance, max_iter=max_iter)
         return jsonify(result)
     except Exception as e:
         print("Lỗi khi xử lý PP Lũy thừa (đơn):", traceback.format_exc())
