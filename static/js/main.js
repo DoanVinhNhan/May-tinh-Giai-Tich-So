@@ -1709,11 +1709,20 @@ function displayDanilevskyResults(result) {
 
         if (result.steps && result.steps.length > 0) {
             html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
-            result.steps.forEach((step, i) => {
-                html += `<div>
-                             <h4 class="font-medium text-gray-700 mb-2">${step.desc || `Bước ${i+1}`}</h4>
-                             <div class="matrix-display">${formatMatrix(step.matrix, displayPrecision)}</div>
-                         </div>`;
+            result.steps.forEach(step => {
+                html += `<div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                    <div class="font-semibold text-indigo-700 mb-2">${step.desc}</div>
+                    <div class="matrix-display">${formatMatrix(step.matrix)}</div>`;
+                if (step.C) {
+                    html += `<div class="mt-2"><b>Ma trận hoán vị C:</b><div class="matrix-display">${formatMatrix(step.C)}</div></div>`;
+                }
+                if (step.M) {
+                    html += `<div class="mt-2"><b>Ma trận biến đổi M:</b><div class="matrix-display">${formatMatrix(step.M)}</div></div>`;
+                }
+                if (step.M_inv) {
+                    html += `<div class="mt-2"><b>Ma trận nghịch đảo M⁻¹:</b><div class="matrix-display">${formatMatrix(step.M_inv)}</div></div>`;
+                }
+                html += `</div>`;
             });
             html += `</div></div>`;
         }

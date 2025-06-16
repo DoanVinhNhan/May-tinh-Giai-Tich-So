@@ -56,7 +56,11 @@ def danilevsky_algorithm(A):
             
             similar = P @ similar @ P
             back = back @ P
-            steps_log.append({'desc': f'Hoán vị cột {j+1} và {k} để tạo phần tử giải.', 'matrix': format_matrix_for_json(similar.copy())})
+            steps_log.append({
+                'desc': f'Hoán vị cột {j+1} và {k} để tạo phần tử giải.',
+                'matrix': format_matrix_for_json(similar.copy()),
+                'C': format_matrix_for_json(P)
+            })
 
         M = np.eye(n, dtype=complex)
         M[k - 1, :] = similar[k, :]
@@ -69,7 +73,12 @@ def danilevsky_algorithm(A):
 
         similar = M @ similar @ M_inv
         back = back @ M_inv
-        steps_log.append({'desc': f'Sau khi biến đổi hàng {k+1}.', 'matrix': format_matrix_for_json(similar.copy())})
+        steps_log.append({
+            'desc': f'Sau khi biến đổi hàng {k+1}.',
+            'matrix': format_matrix_for_json(similar.copy()),
+            'M': format_matrix_for_json(M),
+            'M_inv': format_matrix_for_json(M_inv)
+        })
         
     steps_log.append({'desc': 'Ma trận cuối (dạng tam giác trên theo khối Frobenius)', 'matrix': format_matrix_for_json(similar.copy())})
     
