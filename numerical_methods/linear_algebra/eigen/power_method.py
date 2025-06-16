@@ -121,48 +121,40 @@ def _solve_for_complex_pair(A, x_stable, tol, max_iter):
     return eigenvalues, eigenvectors, [], details
 
 
-def power_method_single(A, tol=1e-9, max_iter=250):
+def power_method_single(A, tol=1e-9, max_iter=250, x0=None):
     """
     Tìm giá trị riêng trội (và vector riêng tương ứng) của ma trận A.
-    Hàm này tự động xử lý 3 trường hợp:
-    1. Một GTR trội thực duy nhất.
-    2. Hai GTR trội trái dấu (bằng cách chạy trên A²).
-    3. Hai GTR trội phức liên hợp.
+    Cho phép truyền vào vector khởi tạo x0.
     """
     n = A.shape[0]
     if n != A.shape[1]:
         return {"success": False, "error": "Ma trận phải là ma trận vuông."}
-
     steps = []
     warnings = []
-    
-    # --- THỬ TRƯỜNG HỢP 1: GTR THỰC TRỘI ---
-    x = np.random.rand(n, 1).astype(complex) # Sử dụng vector phức để xử lý tổng quát
-    x = x / np.linalg.norm(x)
+    # --- SỬ DỤNG x0 NẾU ĐƯỢC TRUYỀN VÀO ---
+    if x0 is not None:
+        x = np.array(x0, dtype=complex).reshape((n, 1))
+        if np.linalg.norm(x) == 0:
+            x = np.ones((n, 1), dtype=complex)
+        x = x / np.linalg.norm(x)
+    else:
+        x = np.random.rand(n, 1).astype(complex)
+        x = x / np.linalg.norm(x)
     lambda_old = 0.0
-
     for i in range(max_iter):
         Ax = A @ x
-        
-        # Ước lượng giá trị riêng bằng Tỷ lệ Rayleigh
         lambda_new = (x.T @ Ax) / (x.T @ x)
         lambda_new = complex(lambda_new[0, 0])
-
-        # Chuẩn hóa
         norm_Ax = np.linalg.norm(Ax)
         if norm_Ax < 1e-12:
             return {"success": True, "message": "Vector lặp tiến về vector không.", "eigenvalues": [_format_complex_number(0.0)], "eigenvectors": [_format_vector(x.flatten())], "steps": steps}
-        
         x_new = Ax / norm_Ax
-        
         steps.append({
             'k': i + 1,
             'x_k': _format_vector(x.flatten()),
             'Ax_k': _format_vector(Ax.flatten()),
             'lambda_k': _format_complex_number(lambda_new)
         })
-
-        # Kiểm tra hội tụ (cho GTR thực)
         if abs(lambda_new.imag) < tol and np.abs(lambda_new.real - lambda_old.real) < tol:
             return {
                 "success": True,
@@ -171,45 +163,31 @@ def power_method_single(A, tol=1e-9, max_iter=250):
                 "eigenvectors": [_format_vector(x_new.flatten())],
                 "steps": steps
             }
-        
         lambda_old = lambda_new
         x = x_new
-
-    # --- NẾU KHÔNG HỘI TỤ, THỬ TRƯỜNG HỢP 3 (PHỨC LIÊN HỢP) ---
     warnings.append("Vòng lặp không hội tụ đơn giản, nghi ngờ có cặp GTR phức hoặc đối dấu.")
     eigenvalues, eigenvectors, errors, complex_details = _solve_for_complex_pair(A, x, tol, max_iter)
-
     if eigenvalues is None:
-        # --- NẾU VẪN THẤT BẠI, THỬ TRƯỜNG HỢP 2 (ĐỐI DẤU) ---
         warnings.append("Thử nghiệm trường hợp GTR đối dấu bằng cách xét A*A.")
         A_squared = A @ A
-        # Gọi đệ quy để tìm GTR của A^2
         lambda_sq_dict = power_method_single(A_squared, tol, max_iter)
-        
         opposite_sign_details = {
             'A_squared': [[_format_complex_number(c) for c in row] for row in A_squared.tolist()],
-            'A_squared_result': lambda_sq_dict, # Recursive result
+            'A_squared_result': lambda_sq_dict,
         }
-        
         if lambda_sq_dict['success'] and len(lambda_sq_dict['eigenvalues']) == 1:
             try:
                 lambda_val_sq_str = lambda_sq_dict['eigenvalues'][0]
                 lambda_val_sq = complex(lambda_val_sq_str.replace('i','j')).real
-                
                 if lambda_val_sq < 0:
                     return {"success": False, "error": f"Không thể tìm GTR đối dấu vì GTR của A² là số âm ({lambda_val_sq:.4f}).", "steps": steps}
-
                 lambda1 = np.sqrt(lambda_val_sq)
-                
                 v_from_A2_str = lambda_sq_dict['eigenvectors'][0]
                 v_from_A2 = np.array([complex(c.replace('i','j')) for c in v_from_A2_str]).reshape(-1,1)
-
-                # Tìm v1, v2 từ v của A^2
                 v1 = (A @ v_from_A2 + lambda1 * v_from_A2)
                 v2 = (A @ v_from_A2 - lambda1 * v_from_A2)
                 v1 /= np.linalg.norm(v1)
                 v2 /= np.linalg.norm(v2)
-
                 opposite_sign_details.update({
                     'lambda_squared_found': _format_complex_number(lambda_val_sq),
                     'v_from_A2': _format_vector(v_from_A2.flatten()),
@@ -220,7 +198,6 @@ def power_method_single(A, tol=1e-9, max_iter=250):
                     'v1_final': _format_vector(v1.flatten()),
                     'v2_final': _format_vector(v2.flatten()),
                 })
-
                 return {
                     "success": True,
                     "message": "Tìm thấy cặp giá trị riêng trội đối dấu.",
@@ -232,10 +209,8 @@ def power_method_single(A, tol=1e-9, max_iter=250):
                 }
             except (ValueError, TypeError, IndexError) as e:
                  return {"success": False, "error": f"Không thể xử lý kết quả từ A² để tìm GTR đối dấu. Lỗi: {str(e)}", "steps": steps}
-
     if eigenvalues is None:
         return {"success": False, "error": f"Không hội tụ sau {max_iter} lần lặp và các phương pháp khác cũng thất bại. {errors}", "steps": steps}
-
     return {
         "success": True,
         "message": "Tìm thấy cặp giá trị riêng trội (trường hợp phức hoặc đối dấu).",
@@ -246,63 +221,55 @@ def power_method_single(A, tol=1e-9, max_iter=250):
         "complex_pair_details": complex_details
     }
 
-def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
+def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100, x0=None):
     """
     Tìm các giá trị riêng và vector riêng trội của ma trận A
     bằng phương pháp Lũy thừa kết hợp Xuống thang (Hotelling's deflation).
-    Hàm này được dùng cho cả việc tìm 1 và nhiều GTR.
+    Cho phép truyền vào vector khởi tạo x0 cho lần lặp đầu tiên.
     """
     try:
         if A.shape[0] != A.shape[1]:
             return {"success": False, "error": "Ma trận phải là ma trận vuông."}
-        
         n = A.shape[0]
         if num_values > n:
-            num_values = n # Giới hạn số GTR cần tìm bằng cấp của ma trận
-            
+            num_values = n
         A_current = A.copy().astype(float)
         eigenvalues = []
         eigenvectors = []
         all_steps = []
-        warnings = [] # Khởi tạo danh sách cảnh báo
-
+        warnings = []
         for s in range(num_values):
-            # --- Power Iteration để tìm GTR trội của A_current ---
-            x = np.random.rand(n, 1) # Vector khởi tạo ngẫu nhiên
-            x = x / np.linalg.norm(x)
-            
+            # --- SỬ DỤNG x0 NẾU ĐƯỢC TRUYỀN VÀO (chỉ cho lần đầu) ---
+            if s == 0 and x0 is not None:
+                x = np.array(x0, dtype=float).reshape((n, 1))
+                if np.linalg.norm(x) == 0:
+                    x = np.ones((n, 1))
+                x = x / np.linalg.norm(x)
+            else:
+                x = np.random.rand(n, 1)
+                x = x / np.linalg.norm(x)
             lambda_prev = 0
             iteration_steps = []
-            
             for i in range(max_iter):
                 Ax = A_current @ x
-                # Tính giá trị riêng bằng công thức Rayleigh
                 lambda_curr = float((x.T @ Ax) / (x.T @ x))
-                
                 norm_Ax = np.linalg.norm(Ax)
-                if norm_Ax == 0: # Tránh lỗi chia cho 0
+                if norm_Ax == 0:
                     break
-                
                 x_new = Ax / norm_Ax
-                
                 iteration_steps.append({
                     "k": i + 1,
                     "x_k": x.flatten().tolist(),
                     "Ax_k": Ax.flatten().tolist(),
                     "lambda_k": lambda_curr
                 })
-                
                 if np.abs(lambda_curr - lambda_prev) < tol:
                     break
-                
                 lambda_prev = lambda_curr
                 x = x_new
-            else: # Nếu vòng lặp kết thúc mà không break (không hội tụ)
-                # THÊM CẢNH BÁO KHI VƯỢT QUÁ SỐ LẦN LẶP
+            else:
                 warnings.append(f"Cảnh báo: Phép lặp cho giá trị riêng thứ {s + 1} không hội tụ sau {max_iter} lần lặp. Kết quả có thể không chính xác.")
-
             eigenvalues.append(lambda_curr)
-            
             all_steps.append({
                 "eigenvalue_index": s + 1,
                 "matrix_before_deflation": A_current.tolist(),
@@ -313,19 +280,14 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
                 },
                 "iteration_details": iteration_steps
             })
-
-            # --- Deflation (Xuống thang) bằng phương pháp Hotelling ---
             if s < num_values - 1:
                 v = x
                 A_current = A_current - lambda_curr * (v @ v.T)
-
         message = (f"Tìm thấy giá trị riêng trội bằng PP Lũy thừa." if num_values == 1 
                    else f"Tìm thấy {len(eigenvalues)} giá trị riêng bằng PP Lũy thừa & Xuống thang.")
-        
         eigenvectors = []
         for eigval in eigenvalues:
             try:
-                # (A - eigval*I)v_k+1 = v_k
                 shifted_A = A - eigval * np.eye(n)
                 v = np.random.rand(n, 1)
                 for _ in range(max_iter): 
@@ -336,7 +298,6 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
                 eigenvectors.append(_format_vector(v.flatten()))
             except np.linalg.LinAlgError:
                 zeros_vec = np.zeros((n, 1), dtype=complex)
-                # Nếu ma trận suy biến, trả về vector không làm placeholder
                 eigenvectors.append(_format_vector(zeros_vec.flatten()))
         return {
             "success": True,
@@ -344,9 +305,8 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
             "eigenvalues": eigenvalues,
             "eigenvectors": eigenvectors,
             "steps": all_steps,
-            "warnings": warnings # Trả về danh sách cảnh báo
+            "warnings": warnings
         }
-
     except np.linalg.LinAlgError as e:
         return {"success": False, "error": f"Lỗi đại số tuyến tính: {e}"}
     except Exception as e:

@@ -759,8 +759,13 @@ function setupMatrixEigenMethodsEvents() {
         }
         const tolerance = document.getElementById('power-single-tolerance').value;
         const max_iter = document.getElementById('power-single-max-iter').value;
+        const x0Input = document.getElementById('power-x0-input');
+        let x0 = null;
+        if (x0Input && x0Input.value.trim()) {
+            x0 = x0Input.value.trim().split(/\s+/).map(Number);
+        }
         const body = { matrix_a: matrixA, tolerance: tolerance, max_iter: max_iter };
-        // Sửa ở đây: Chỉ 2 tham số
+        if (x0) body.x0 = x0;
         handleCalculation('/matrix/eigen/power-single', body);
     };
 
@@ -775,8 +780,13 @@ function setupMatrixEigenMethodsEvents() {
         const num_eigen = document.getElementById('power-deflation-num-eigen').value;
         const tolerance = document.getElementById('power-deflation-tolerance').value;
         const max_iter = document.getElementById('power-deflation-max-iter').value;
+        const x0Input = document.getElementById('power-x0-input');
+        let x0 = null;
+        if (x0Input && x0Input.value.trim()) {
+            x0 = x0Input.value.trim().split(/\s+/).map(Number);
+        }
         const body = { matrix_a: matrixA, num_eigen: num_eigen, tolerance: tolerance, max_iter: max_iter };
-        // Sửa ở đây: Chỉ 2 tham số
+        if (x0) body.x0 = x0;
         handleCalculation('/matrix/eigen/power-deflation', body);
     };
 }
