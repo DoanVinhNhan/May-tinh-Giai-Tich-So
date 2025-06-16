@@ -5,7 +5,7 @@ def zero_small(x, tol=1e-15):
     x[np.abs(x) < tol] = 0.0
     return x
 
-def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-8, y_init=None):
+def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=None):
     """
     Tính SVD của ma trận A bằng phương pháp power method + deflation.
     Trả về step-by-step cho từng giá trị kỳ dị, ghi rõ ma trận deflation và vector riêng tại mỗi bước.
@@ -84,8 +84,12 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-8, y_init=None
     Sigma = np.zeros((m, n))
     for i in range(len(singular_values)):
         Sigma[i, i] = singular_values[i]
-    # Tạo dạng rút gọn
-    diag_len = len(singular_values)
+    # Tính rank thực sự (số giá trị kỳ dị > ngưỡng)
+    effective_singular_values = [s for s in singular_values if s > tol]
+    r = len(effective_singular_values)  # Rank thực sự
+    
+    # Tạo dạng rút gọn dựa trên rank thực sự
+    diag_len = r if r > 0 else 1  # Tránh trường hợp r = 0
     U_reduced = U[:, :diag_len]
     Sigma_reduced = Sigma[:diag_len, :diag_len]
     Vt_reduced = V.T[:diag_len, :]
@@ -101,6 +105,7 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-8, y_init=None
     # Trả về kết quả
     return {
         'success': True,
+        'rank': r,  # Thêm thông tin rank
         'U': zero_small(U).tolist(),
         'Sigma': zero_small(Sigma).tolist(),
         'V_transpose': zero_small(V.T).tolist(),
@@ -111,6 +116,7 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-8, y_init=None
         'intermediate_steps': {
             'A_transpose_A': zero_small(ATA).tolist(),
             'singular_values': [float(s) for s in singular_values],
+            'effective_rank': r,  # Thông tin rank trong steps
             'steps': steps
         }
     }
@@ -128,17 +134,25 @@ def svd_numpy(A):
             return {"success": False, "error": "Ma trận đầu vào không được rỗng."}
         m, n = A.shape
         U, s, Vt = np.linalg.svd(A, full_matrices=False)
-        Sigma = np.zeros((m, n))
-        diag_len = min(m, n, s.shape[0])
-        Sigma[:diag_len, :diag_len] = np.diag(s[:diag_len])
         
-        # Giảm bớt kích thước ma trận theo số lượng giá trị kỳ dị
+        # Tính rank thực sự (số giá trị kỳ dị > ngưỡng)
+        effective_singular_values = s[s > 1e-15]  # Lọc giá trị kỳ dị có ý nghĩa
+        r = len(effective_singular_values)  # Rank thực sự
+        
+        # Tạo ma trận Sigma đầy đủ và rút gọn
+        Sigma = np.zeros((m, n))
+        diag_len_full = min(m, n, s.shape[0])
+        Sigma[:diag_len_full, :diag_len_full] = np.diag(s[:diag_len_full])
+        
+        # Tạo dạng rút gọn dựa trên rank thực sự
+        diag_len = r if r > 0 else 1  # Tránh trường hợp r = 0
         U_reduced = U[:, :diag_len]
-        Sigma_reduced = Sigma[:diag_len, :diag_len]
+        Sigma_reduced = np.diag(effective_singular_values) if r > 0 else np.zeros((1, 1))
         Vt_reduced = Vt[:diag_len, :]
         
         return {
             "success": True,
+            "rank": r,  # Thêm thông tin rank
             "U": zero_small(U).tolist(),
             "Sigma": zero_small(Sigma).tolist(),
             "V_transpose": zero_small(Vt).tolist(),
@@ -151,10 +165,11 @@ def svd_numpy(A):
                     "u": u_i.tolist(),
                     "v": v_i.tolist()
                 }
-                for sigma_i, u_i, v_i in zip(s, U.T, Vt)
+                for sigma_i, u_i, v_i in zip(effective_singular_values, U.T[:r], Vt[:r])  # Chỉ lấy r thành phần có ý nghĩa
             ],
             "intermediate_steps": {
-                "note": "Không có các bước trung gian chi tiết khi dùng numpy.linalg.svd."
+                "note": "Không có các bước trung gian chi tiết khi dùng numpy.linalg.svd.",
+                "effective_rank": r  # Thông tin rank
             }
         }
     except Exception as e:

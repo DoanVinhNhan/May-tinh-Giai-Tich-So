@@ -87,6 +87,7 @@ def solve_lu(matrix_a, matrix_b):
     trả về nghiệm đúng cho cả 3 trường hợp (vô nghiệm, duy nhất, vô số nghiệm),
     hỗ trợ nhiều vế phải.
     Tất cả các số có trị tuyệt đối nhỏ hơn 1e-15 sẽ được làm tròn thành 0 trong kết quả trả về.
+    Ngoài ra, trả về các bước trung gian của LU không pivoting (lu_steps).
     """
     try:
         A = np.asarray(matrix_a, dtype=float)
@@ -101,6 +102,19 @@ def solve_lu(matrix_a, matrix_b):
             P, L, U = scipy.linalg.lu(A)
         except Exception as e:
             return {"success": False, "error": f"Lỗi khi phân rã LU: {e}"}
+        # 1b. Phân rã LU không pivoting để lấy các bước trung gian
+        try:
+            _, _, lu_steps = lu_decomposition(A)
+            # Chuyển các bước sang dạng list để tương thích JSON
+            lu_steps_serialized = []
+            for step in lu_steps:
+                lu_steps_serialized.append({
+                    'step': step['step'],
+                    'L': zero_small(step['L']).tolist(),
+                    'U': zero_small(step['U']).tolist()
+                })
+        except Exception as e:
+            lu_steps_serialized = []
         # 2. Phân tích hạng
         rank_A = np.linalg.matrix_rank(A)
         AB = np.hstack((A, B))
@@ -112,7 +126,8 @@ def solve_lu(matrix_a, matrix_b):
                 "status": "no_solution",
                 "message": f"Hệ vô nghiệm (rank(A)={rank_A} < rank([A|B])={rank_AB})",
                 "decomposition": {"L": zero_small(L).tolist(), "U": zero_small(U).tolist(), "P": zero_small(P).tolist()},
-                "intermediate_y": None
+                "intermediate_y": None,
+                "lu_steps": lu_steps_serialized
             }
         elif rank_A == n:
             # Nghiệm duy nhất
@@ -127,7 +142,8 @@ def solve_lu(matrix_a, matrix_b):
                 "message": ket_luan,
                 "solution": zero_small(X).tolist(),
                 "decomposition": {"L": zero_small(L).tolist(), "U": zero_small(U).tolist(), "P": zero_small(P).tolist()},
-                "intermediate_y": zero_small(Y).tolist()
+                "intermediate_y": zero_small(Y).tolist(),
+                "lu_steps": lu_steps_serialized
             }
         else:
             # Vô số nghiệm
@@ -146,7 +162,8 @@ def solve_lu(matrix_a, matrix_b):
                     "particular_solution": zero_small(nghiem_rieng).tolist(),
                     "null_space_vectors": zero_small(null_space).tolist(),
                     "num_free_vars": null_space.shape[1] if null_space.ndim == 2 else 0
-                }
+                },
+                "lu_steps": lu_steps_serialized
             }
     except Exception as e:
         import traceback

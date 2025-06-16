@@ -1413,13 +1413,13 @@ function displayInverseResults(result, method) {
         const qValueFormatted = formatNumber(qValue, 6);
         const latexString = String.raw`||I - AX_0||_2 \approx ${qValueFormatted}`;
         try {
-            katex.render(latexString, errorFormulaEl, {
+            katex.render(latexString, qProminentBlock, {
                 throwOnError: false,
                 displayMode: false
             });
         } catch (e) {
             console.error("Lỗi render KaTeX", e);
-            errorFormulaEl.textContent = "Công thức lỗi...";
+            qProminentBlock.textContent = "Công thức lỗi...";
         }
     }
 }
@@ -1586,8 +1586,22 @@ function displayLuResults(result) {
                         <div class="matrix-display">${formatMatrix(result.decomposition.U)}</div>
                      </div>`;
         }
+        if (result.lu_steps && result.lu_steps.length > 0) {
+            html += `<div class="mt-8"><h3 class="result-heading">Các bước trung gian phân tích LU</h3>`;
+            result.lu_steps.forEach(step => {
+                html += `
+                    <div class="mb-4 p-3 bg-gray-50 rounded border">
+                        <div class="font-semibold text-indigo-700 mb-2">Bước ${step.step}</div>
+                        <div><b>L:</b> <div class="matrix-display">${formatMatrix(step.L)}</div></div>
+                        <div class="mt-2"><b>U:</b> <div class="matrix-display">${formatMatrix(step.U)}</div></div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
 
         html += `</div>`; // Đóng thẻ div của mục "Các Ma Trận Phân Rã"
+    
     }
     if (result.status === 'unique_solution' && result.intermediate_y) {
         html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3>`;
