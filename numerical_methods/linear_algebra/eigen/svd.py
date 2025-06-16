@@ -102,6 +102,41 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
         }
         for i in range(diag_len)
     ]
+    # Tính ma trận xấp xỉ từ SVD
+    def compute_approximations():
+        # Xấp xỉ đầy đủ
+        A_full_approx = U @ Sigma @ V.T
+        
+        # Xấp xỉ rút gọn (chỉ dùng rank thực sự)  
+        A_reduced_approx = U_reduced @ Sigma_reduced @ Vt_reduced
+        
+        # Xấp xỉ từng thành phần (rank-1 approximations)
+        rank_approximations = []
+        A_cumulative = np.zeros_like(A)
+        
+        for i in range(r):
+            # Xấp xỉ rank-1: σᵢ * uᵢ * vᵢ^T
+            rank_1_approx = singular_values[i] * np.outer(U[:, i], V[:, i])
+            A_cumulative += rank_1_approx
+            
+            rank_approximations.append({
+                "rank": i + 1,
+                "singular_value": float(singular_values[i]),
+                "rank_1_component": zero_small(rank_1_approx).tolist(),
+                "cumulative_approximation": zero_small(A_cumulative.copy()).tolist(),
+                "frobenius_error": float(np.linalg.norm(A - A_cumulative, 'fro'))
+            })
+        
+        return {
+            "full_approximation": zero_small(A_full_approx).tolist(),
+            "reduced_approximation": zero_small(A_reduced_approx).tolist(), 
+            "rank_approximations": rank_approximations,
+            "reconstruction_error_full": float(np.linalg.norm(A - A_full_approx, 'fro')),
+            "reconstruction_error_reduced": float(np.linalg.norm(A - A_reduced_approx, 'fro'))
+        }
+    
+    approximations = compute_approximations()
+    
     # Trả về kết quả
     return {
         'success': True,
@@ -118,7 +153,8 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
             'singular_values': [float(s) for s in singular_values],
             'effective_rank': r,  # Thông tin rank trong steps
             'steps': steps
-        }
+        },
+        "approximations": approximations  # Thêm thông tin về các ma trận xấp xỉ
     }
 
 def svd_numpy(A):
@@ -189,3 +225,121 @@ def calculate_svd(A, method='default', **kwargs):
         return svd_power_deflation(A, num_singular=num_singular, num_iter=num_iter, tol=tol, y_init=y_init)
     else:
         return svd_numpy(A)
+
+def calculate_svd_approximation(A, method='rank-k', **kwargs):
+    """
+    Tính ma trận xấp xỉ từ SVD.
+    
+    Args:
+        A: np.ndarray, ma trận đầu vào
+        method: str, phương pháp xấp xỉ ('rank-k', 'threshold', 'error-bound')
+        **kwargs: các tham số tùy chọn
+            - k: số thành phần giữ lại (cho rank-k)
+            - threshold: ngưỡng giá trị kỳ dị (cho threshold)
+            - error_bound: sai số tối đa cho phép (cho error-bound)
+    
+    Returns:
+        dict: kết quả chứa ma trận xấp xỉ và thông tin chi tiết
+    """
+    try:
+        A = np.array(A, dtype=float)
+        m, n = A.shape
+        
+        # Tính SVD đầy đủ
+        U, s, Vt = np.linalg.svd(A, full_matrices=False)
+        
+        # Xác định số thành phần giữ lại
+        if method == 'rank-k':
+            k = kwargs.get('k', min(m, n))
+            k = min(k, len(s))  # Không vượt quá số giá trị kỳ dị có sẵn
+            selected_indices = list(range(k))
+            
+        elif method == 'threshold':
+            threshold = kwargs.get('threshold', 1e-10)
+            selected_indices = [i for i, sigma in enumerate(s) if sigma > threshold]
+            k = len(selected_indices)
+            
+        elif method == 'error-bound':
+            error_bound = kwargs.get('error_bound', 0.1)
+            # Tìm k sao cho ||A - A_k||_F <= error_bound
+            # ||A - A_k||_F^2 = sum(sigma_i^2 for i > k)
+            cumulative_error_squared = 0
+            k = len(s)  # Bắt đầu từ cuối
+            
+            for i in range(len(s) - 1, -1, -1):
+                cumulative_error_squared += s[i]**2
+                current_error = np.sqrt(cumulative_error_squared)
+                if current_error <= error_bound:
+                    k = i
+                else:
+                    break
+            
+            selected_indices = list(range(k))
+            
+        else:
+            return {"success": False, "error": f"Phương pháp '{method}' không được hỗ trợ."}
+        
+        # Tạo ma trận xấp xỉ
+        if len(selected_indices) == 0:
+            A_approx = np.zeros_like(A)
+            effective_rank = 0
+        else:
+            U_k = U[:, selected_indices]
+            s_k = s[selected_indices]
+            Vt_k = Vt[selected_indices, :]
+            A_approx = U_k @ np.diag(s_k) @ Vt_k
+            effective_rank = len(selected_indices)
+        
+        # Tính sai số Frobenius
+        error_matrix = A - A_approx
+        frobenius_error = np.linalg.norm(error_matrix, 'fro')
+        relative_error = frobenius_error / np.linalg.norm(A, 'fro') if np.linalg.norm(A, 'fro') > 0 else 0
+        
+        # Tạo thông tin chi tiết về các thành phần được giữ lại
+        retained_components = []
+        for i in selected_indices:
+            retained_components.append({
+                "index": i + 1,
+                "singular_value": float(s[i]),
+                "u_vector": U[:, i].tolist(),
+                "v_vector": Vt[i, :].tolist(),
+                "contribution": float(s[i]**2 / np.sum(s**2) * 100)  # % đóng góp
+            })
+        
+        # Tạo thông tin về các thành phần bị loại bỏ
+        discarded_indices = [i for i in range(len(s)) if i not in selected_indices]
+        discarded_components = []
+        for i in discarded_indices:
+            discarded_components.append({
+                "index": i + 1,
+                "singular_value": float(s[i]),
+                "contribution": float(s[i]**2 / np.sum(s**2) * 100)
+            })
+        
+        return {
+            "success": True,
+            "original_matrix": zero_small(A).tolist(),
+            "approximated_matrix": zero_small(A_approx).tolist(),
+            "error_matrix": zero_small(error_matrix).tolist(),
+            "method_used": method,
+            "effective_rank": effective_rank,
+            "original_rank": len(s),
+            "frobenius_error": float(frobenius_error),
+            "relative_error": float(relative_error * 100),  # Phần trăm
+            "retained_components": retained_components,
+            "discarded_components": discarded_components,
+            "all_singular_values": s.tolist(),
+            "compression_ratio": float(effective_rank / min(m, n) * 100),  # Phần trăm rank được giữ lại
+            "detailed_info": {
+                "original_shape": [m, n],
+                "threshold_used": kwargs.get('threshold') if method == 'threshold' else None,
+                "k_used": effective_rank if method == 'rank-k' else None,
+                "error_bound_used": kwargs.get('error_bound') if method == 'error-bound' else None,
+                "total_energy": float(np.sum(s**2)),
+                "retained_energy": float(np.sum([s[i]**2 for i in selected_indices])),
+                "energy_ratio": float(np.sum([s[i]**2 for i in selected_indices]) / np.sum(s**2) * 100)
+            }
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": f"Lỗi trong quá trình tính toán: {str(e)}"}

@@ -372,5 +372,38 @@ def handle_power_deflation():
         print("Lỗi khi xử lý PP Lũy thừa & Xuống thang:", traceback.format_exc())
         return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
 
+@app.route('/matrix/svd_approximation', methods=['POST'])
+def handle_svd_approximation():
+    data = request.get_json()
+    if not data or 'matrix_a' not in data:
+        return jsonify({"success": False, "error": "Dữ liệu không hợp lệ: Thiếu ma trận A."}), 400
+    
+    try:
+        matrix_a = np.array(data['matrix_a'], dtype=float)
+        approximation_method = data.get('approximation_method', 'rank-k')
+        
+        # Import hàm xấp xỉ SVD (sẽ tạo sau)
+        from numerical_methods.linear_algebra.eigen.svd import calculate_svd_approximation
+        
+        # Tham số cho các phương pháp khác nhau
+        if approximation_method == 'rank-k':
+            k = data.get('k', 2)
+            result = calculate_svd_approximation(matrix_a, method='rank-k', k=k)
+        elif approximation_method == 'threshold':
+            threshold = data.get('threshold', 1e-10)
+            result = calculate_svd_approximation(matrix_a, method='threshold', threshold=threshold)
+        elif approximation_method == 'error-bound':
+            error_bound = data.get('error_bound', 0.1)
+            result = calculate_svd_approximation(matrix_a, method='error-bound', error_bound=error_bound)
+        else:
+            return jsonify({"success": False, "error": "Phương pháp xấp xỉ không hợp lệ."}), 400
+        
+        result['success'] = True if 'error' not in result else False
+        return jsonify(result)
+    
+    except Exception as e:
+        print("Lỗi khi xử lý SVD approximation:", traceback.format_exc())
+        return jsonify({"success": False, "error": f"Lỗi: {str(e)}"}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

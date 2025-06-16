@@ -441,7 +441,8 @@ async function handleCalculation(endpoint, body) {
             'newton': wrapDisplay(displayInverseResults),
             'gauss-seidel': wrapDisplay(displayInverseResults),
             'nonlinear-system/solve': wrapDisplay(displayNonlinearSystemResults),
-            'polynomial/solve': wrapDisplay(displayPolynomialResults)
+            'polynomial/solve': wrapDisplay(displayPolynomialResults),
+            'svd_approximation': wrapDisplay(displaySvdApproximationResults)
         };
         
         let key = endpoint.split('/').pop();
@@ -464,6 +465,8 @@ async function handleCalculation(endpoint, body) {
                 displayGaussSeidelAnalysis(result);
             }
             return;
+        } else if (endpoint === '/matrix/svd_approximation'){
+            key = 'svd_approximation';
         }
         
         if (displayMap[key]) {
@@ -519,6 +522,10 @@ function renderPage(page) {
         pageHtml = document.getElementById('matrix-svd-page').innerHTML;
         setupFunction = setupMatrixSvdEvents;
         title = 'Phân Rã Giá Trị Suy Biến (SVD)';
+    } else if (page === 'matrix-approximation') {
+        pageHtml = document.getElementById('matrix-approximation-page').innerHTML;
+        setupFunction = setupMatrixApproximationEvents;
+        title = 'Ma Trận Xấp Xỉ SVD';
     } else if (page === 'matrix-eigen-methods') {
         pageHtml = document.getElementById('matrix-eigen-methods-page').innerHTML;
         pageTitle.textContent = 'Tìm Giá Trị Riêng';
@@ -711,6 +718,79 @@ function setupMatrixSvdEvents() {
             }
         }
         handleCalculation('/matrix/svd', body);
+    };
+}
+
+// Hàm setup cho trang Ma trận xấp xỉ SVD
+function setupMatrixApproximationEvents() {
+    const matrixA_Input = document.getElementById('matrix-a-input-approx');
+    const methodSelect = document.getElementById('approx-method-select');
+    const rankKOptions = document.getElementById('rank-k-options');
+    const thresholdOptions = document.getElementById('threshold-options');
+    const errorBoundOptions = document.getElementById('error-bound-options');
+    
+    // Hiển thị/ẩn các tùy chọn theo phương pháp được chọn
+    function updateApproxOptions() {
+        if (!methodSelect) return;
+        
+        const method = methodSelect.value;
+        
+        // Ẩn tất cả tùy chọn
+        if (rankKOptions) rankKOptions.classList.add('hidden');
+        if (thresholdOptions) thresholdOptions.classList.add('hidden');
+        if (errorBoundOptions) errorBoundOptions.classList.add('hidden');
+        
+        // Hiển thị tùy chọn tương ứng
+        switch(method) {
+            case 'rank-k':
+                if (rankKOptions) rankKOptions.classList.remove('hidden');
+                break;
+            case 'threshold':
+                if (thresholdOptions) thresholdOptions.classList.remove('hidden');
+                break;
+            case 'error-bound':
+                if (errorBoundOptions) errorBoundOptions.classList.remove('hidden');
+                break;
+        }
+    }
+    
+    if (methodSelect) {
+        methodSelect.onchange = updateApproxOptions;
+        updateApproxOptions();
+    }
+
+    document.getElementById('calculate-approximation-btn').onclick = () => {
+        const matrixA = parseMatrix(matrixA_Input.value);
+        if (matrixA.error || matrixA.length === 0) {
+            displayError('Ma trận A không được để trống.', 'error-message-approx');
+            return;
+        }
+        
+        const method = methodSelect ? methodSelect.value : 'rank-k';
+        const body = { 
+            matrix_a: matrixA, 
+            approximation_method: method 
+        };
+        
+        // Thêm tham số tùy theo phương pháp
+        if (method === 'rank-k') {
+            const rankK = document.getElementById('rank-k-value');
+            if (rankK && rankK.value) {
+                body.k = parseInt(rankK.value);
+            }
+        } else if (method === 'threshold') {
+            const threshold = document.getElementById('threshold-value');
+            if (threshold && threshold.value) {
+                body.threshold = parseFloat(threshold.value);
+            }
+        } else if (method === 'error-bound') {
+            const errorBound = document.getElementById('error-bound-value');
+            if (errorBound && errorBound.value) {
+                body.error_bound = parseFloat(errorBound.value);
+            }
+        }
+        
+        handleCalculation('/matrix/svd_approximation', body);
     };
 }
 // Hàm setup lại event cho trang Danilevsky
@@ -2335,3 +2415,84 @@ function displayGaussSeidelAnalysis(result) {
             }
         }
     }
+
+// Thêm hàm mới này vào file main.js
+function displaySvdApproximationResults(result) {
+    const resultsArea = document.getElementById('results-area');
+    if (!resultsArea) return;
+
+    let html = `<h3 class="result-heading">Kết Quả Xấp Xỉ SVD</h3>`;
+
+    // Khối tóm tắt
+    html += `
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h4 class="font-semibold text-gray-700 text-lg mb-3 text-center">Tóm Tắt Kết Quả</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="p-3 bg-white rounded-md shadow-sm">
+                    <span class="font-medium text-gray-600">Phương pháp</span>
+                    <p class="text-base text-gray-800 mt-1">${result.method_used}</p>
+                </div>
+                <div class="p-3 bg-white rounded-md shadow-sm">
+                    <span class="font-medium text-gray-600">Rank gốc / Rank xấp xỉ</span>
+                    <p class="font-mono text-xl text-blue-600 mt-1">${result.original_rank} / ${result.effective_rank}</p>
+                </div>
+                <div class="p-3 bg-white rounded-md shadow-sm">
+                    <span class="font-medium text-gray-600">Sai số tương đối</span>
+                    <p class="font-mono text-xl text-red-600 mt-1">${formatNumber(result.relative_error, 4)}%</p>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <span class="font-medium text-gray-600">Năng lượng giữ lại:</span>
+                <p class="font-mono text-lg text-green-700">${formatNumber(result.detailed_info.energy_ratio, 4)}%</p>
+            </div>
+        </div>
+    `;
+
+    // Hiển thị các ma trận
+    html += `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+            <h4 class="font-medium text-gray-700 text-center mb-2">Ma trận gốc A</h4>
+            <div class="matrix-display">${formatMatrix(result.original_matrix)}</div>
+        </div>
+        <div>
+            <h4 class="font-medium text-gray-700 text-center mb-2">Ma trận xấp xỉ A_k</h4>
+            <div class="matrix-display">${formatMatrix(result.approximated_matrix)}</div>
+        </div>
+        <div class="lg:col-span-2">
+            <h4 class="font-medium text-gray-700 text-center mb-2">Ma trận sai số (A - A_k)</h4>
+            <div class="matrix-display">${formatMatrix(result.error_matrix)}</div>
+        </div>
+    </div>
+    `;
+
+    // Chi tiết các thành phần
+    html += `<div class="mt-10"><h3 class="result-heading">Chi Tiết Các Thành Phần Kỳ Dị</h3>`;
+    html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">`;
+    if (result.retained_components && result.retained_components.length > 0) {
+        html += `<div>
+                    <h4 class="font-semibold text-green-700 text-center mb-2">Các thành phần được giữ lại (${result.retained_components.length})</h4>
+                    <div class="space-y-2 text-sm">`;
+        result.retained_components.forEach(comp => {
+            html += `<div class="p-2 bg-green-50 border border-green-200 rounded">
+                        <b>#${comp.index}:</b> σ = ${formatNumber(comp.singular_value, 4)}, Đóng góp: ${formatNumber(comp.contribution, 2)}%
+                     </div>`;
+        });
+        html += `</div></div>`;
+    }
+    if (result.discarded_components && result.discarded_components.length > 0) {
+        html += `<div>
+                    <h4 class="font-semibold text-red-700 text-center mb-2">Các thành phần bị loại bỏ (${result.discarded_components.length})</h4>
+                    <div class="space-y-2 text-sm">`;
+        result.discarded_components.forEach(comp => {
+            html += `<div class="p-2 bg-red-50 border border-red-200 rounded">
+                        <b>#${comp.index}:</b> σ = ${formatNumber(comp.singular_value, 4)}, Đóng góp: ${formatNumber(comp.contribution, 2)}%
+                    </div>`;
+        });
+        html += `</div></div>`;
+    }
+    html += `</div></div>`;
+
+    resultsArea.innerHTML = html;
+    attachCopyMatrixEvents();
+}

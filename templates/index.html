@@ -29,6 +29,7 @@
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-direct">Tính ma trận nghịch đảo</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-iterative">PP Lặp - Tính ma trận nghịch đảo</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Phân tích SVD</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-approximation">Ma trận xấp xỉ SVD</button></li>
                         <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-eigen-methods">Tìm giá trị riêng</button></li>
                     </ul>
                 </li>
@@ -522,6 +523,49 @@ sidebarToggle.addEventListener('click', () => {
     <div class="mt-8 mb-8">
         <button id="calculate-poly-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tìm Nghiệm Thực</button>
     </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<!-- Tab Ma trận xấp xỉ SVD -->
+<div id="matrix-approximation-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-approx" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-approx" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+    </div>
+    
+    <div class="mb-6">
+        <label for="approx-method-select" class="block text-sm font-medium text-gray-700">Phương pháp xấp xỉ</label>
+        <select id="approx-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2">
+            <option value="rank-k">Xấp xỉ rank-k (k giá trị kỳ dị lớn nhất)</option>
+            <option value="threshold">Xấp xỉ theo ngưỡng (giá trị kỳ dị > ngưỡng)</option>
+            <option value="error-bound">Xấp xỉ theo sai số (sai số < giới hạn)</option>
+        </select>
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ rank-k -->
+    <div id="rank-k-options" class="mb-6">
+        <label for="rank-k-value" class="block text-sm font-medium text-gray-700">Giá trị k (số thành phần giữ lại)</label>
+        <input id="rank-k-value" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="2" value="2">
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ theo ngưỡng -->
+    <div id="threshold-options" class="mb-6 hidden">
+        <label for="threshold-value" class="block text-sm font-medium text-gray-700">Ngưỡng giá trị kỳ dị</label>
+        <input id="threshold-value" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="1e-10" value="1e-10">
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ theo sai số -->
+    <div id="error-bound-options" class="mb-6 hidden">
+        <label for="error-bound-value" class="block text-sm font-medium text-gray-700">Sai số tối đa (chuẩn Frobenius)</label>
+        <input id="error-bound-value" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="0.1" value="0.1">
+    </div>
+
+    <div class="mb-6">
+        <button id="calculate-approximation-btn" class="action-btn bg-green-600 hover:bg-green-700">Tính ma trận xấp xỉ</button>
+    </div>
+    
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
     <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
     <div id="results-area"></div>
