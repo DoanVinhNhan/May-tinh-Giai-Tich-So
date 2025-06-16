@@ -3,19 +3,6 @@ import numpy as np
 # ==============================================================================
 # CÁC HÀM TIỆN ÍCH (HELPER FUNCTIONS)
 # ==============================================================================
-def _format_matrix_for_json(m, precision=5):
-    """Định dạng một ma trận (có thể phức) cho đầu ra JSON."""
-    if m is None:
-        return None
-    return [[_format_complex_number(cell, precision) for cell in row] for row in m.tolist()]
-
-def _parse_complex_str(s):
-    """
-    Hàm tiện ích để chuyển chuỗi định dạng trở lại số phức.
-    """
-    if not s: return 0.0
-    return complex(s.replace('i', 'j'))
-
 def _format_complex_number(c, precision=5):
     """
     Định dạng một số phức hoặc số thực để hiển thị.
@@ -61,54 +48,11 @@ def _format_vector(vec, precision=5):
     """Định dạng một vector để hiển thị."""
     return [_format_complex_number(c, precision) for c in vec]
 
-
-def _find_left_eigenvector(A_T_conj, eigenvalue, tol=1e-9, max_iter=20):
-    """
-    Tìm VTR trái bằng phương pháp lặp nghịch đảo với dịch chuyển.
-    Đây là phương pháp hiệu quả để tìm VTR khi đã biết GTR.
-    """
-    n = A_T_conj.shape[0]
-    shifted_A = A_T_conj - eigenvalue * np.eye(n)
-    w = np.random.rand(n, 1).astype(complex)
-    w = w / np.linalg.norm(w)
-    
-    try:
-        for _ in range(max_iter):
-            w_new = np.linalg.solve(shifted_A, w)
-            norm = np.linalg.norm(w_new)
-            if norm < tol: return None
-            w = w_new / norm
-        return w
-    except np.linalg.LinAlgError:
-        # Nếu ma trận suy biến, GTR đã rất chính xác.
-        # Ta có thể thử lại với một dịch chuyển nhỏ để tránh suy biến.
-        try:
-            shift = tol * (1+1j)
-            shifted_A_again = A_T_conj - (eigenvalue + shift) * np.eye(n)
-            w = np.linalg.solve(shifted_A_again, w)
-            return w / np.linalg.norm(w)
-        except np.linalg.LinAlgError:
-            return None # Thất bại
-
-def _find_eigenvector(A, eigenvalue, tol=1e-9, max_iter=20):
-    """Tìm VTR bằng phương pháp lặp nghịch đảo với dịch chuyển."""
-    n = A.shape[0]
-    v = np.random.rand(n, 1).astype(complex)
-    v /= np.linalg.norm(v)
-    try:
-        shifted_A = A - eigenvalue * np.eye(n)
-        for _ in range(max_iter):
-            v_new = np.linalg.solve(shifted_A, v)
-            norm = np.linalg.norm(v_new)
-            if norm < tol: return None
-            v = v_new / norm
-        return v
-    except np.linalg.LinAlgError: return None
 # ==============================================================================
 # TRIỂN KHAI PHƯƠNG PHÁP LŨY THỪA (DỰA TRÊN TÀI LIỆU)
 # ==============================================================================
 
-def _solve_for_complex_pair(A, x_stable, tol):
+def _solve_for_complex_pair(A, x_stable, tol, max_iter):
     """
     Hàm này được gọi khi phương pháp lặp đơn giản không hội tụ.
     Nó giải quyết trường hợp có một cặp giá trị riêng phức liên hợp trội.
@@ -164,9 +108,11 @@ def _solve_for_complex_pair(A, x_stable, tol):
             # (A - eigval*I)v_k+1 = v_k
             shifted_A = A - eigval * np.eye(n)
             v = np.random.rand(n, 1).astype(complex) # Khởi tạo vector phức
-            for _ in range(10): # Vài vòng lặp là đủ để hội tụ về VTR gần nhất
+            for _ in range(max_iter): # Vài vòng lặp là đủ để hội tụ về VTR gần nhất
                 v_new = np.linalg.solve(shifted_A, v)
                 v = v_new / np.linalg.norm(v_new)
+                if np.linalg.norm(v - v_new) < tol:
+                    break
             eigenvectors.append(v)
         except np.linalg.LinAlgError:
             # Nếu ma trận suy biến, trả về vector không làm placeholder
@@ -231,7 +177,7 @@ def power_method_single(A, tol=1e-9, max_iter=250):
 
     # --- NẾU KHÔNG HỘI TỤ, THỬ TRƯỜNG HỢP 3 (PHỨC LIÊN HỢP) ---
     warnings.append("Vòng lặp không hội tụ đơn giản, nghi ngờ có cặp GTR phức hoặc đối dấu.")
-    eigenvalues, eigenvectors, errors, complex_details = _solve_for_complex_pair(A, x, tol)
+    eigenvalues, eigenvectors, errors, complex_details = _solve_for_complex_pair(A, x, tol, max_iter)
 
     if eigenvalues is None:
         # --- NẾU VẪN THẤT BẠI, THỬ TRƯỜNG HỢP 2 (ĐỐI DẤU) ---
@@ -356,7 +302,6 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
                 warnings.append(f"Cảnh báo: Phép lặp cho giá trị riêng thứ {s + 1} không hội tụ sau {max_iter} lần lặp. Kết quả có thể không chính xác.")
 
             eigenvalues.append(lambda_curr)
-            eigenvectors.append(x.flatten().tolist())
             
             all_steps.append({
                 "eigenvalue_index": s + 1,
@@ -376,7 +321,23 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100):
 
         message = (f"Tìm thấy giá trị riêng trội bằng PP Lũy thừa." if num_values == 1 
                    else f"Tìm thấy {len(eigenvalues)} giá trị riêng bằng PP Lũy thừa & Xuống thang.")
-
+        
+        eigenvectors = []
+        for eigval in eigenvalues:
+            try:
+                # (A - eigval*I)v_k+1 = v_k
+                shifted_A = A - eigval * np.eye(n)
+                v = np.random.rand(n, 1)
+                for _ in range(max_iter): 
+                    v_new = np.linalg.solve(shifted_A, v)
+                    v = v_new / np.linalg.norm(v_new)
+                    if np.linalg.norm(v_new - v) < tol:
+                        break
+                eigenvectors.append(_format_vector(v.flatten()))
+            except np.linalg.LinAlgError:
+                zeros_vec = np.zeros((n, 1), dtype=complex)
+                # Nếu ma trận suy biến, trả về vector không làm placeholder
+                eigenvectors.append(_format_vector(zeros_vec.flatten()))
         return {
             "success": True,
             "message": message,

@@ -456,6 +456,9 @@ async function handleCalculation(endpoint, body) {
             return; 
         } else if (endpoint.includes('/matrix/iterative/')) {
             displayIterativeHptResults(result, key);
+            if (key === 'jacobi') {
+                displayJacobiAnalysis(result);
+            }
             return;
         }
         
@@ -1054,7 +1057,7 @@ function displayEigenPowerResults(result) {
     if (result.eigenvalues && result.eigenvectors) {
         html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
                     <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Kết quả cuối cùng</h4>
-                    <table class=" collapsible-table min-w-full divide-y divide-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="px-4 py-2 text-left font-medium text-gray-600">#</th>
@@ -2123,23 +2126,15 @@ function displayIterativeHptResults(result, method) {
         const firstStep = result.steps[0];
         let tableHtml = '';
 
-        if (firstStep.table) { // Jacobi, Gauss-Seidel
-            tableHtml = createIterativeTable(firstStep.table, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||∞']);
-        } else if (firstStep.B) { // Jacobi (cách hiển thị cũ)
-             html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
-             result.steps.forEach(step => {
-                 if (step.table) {
-                    tableHtml = createIterativeTable(step.table, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||∞']);
-                    html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>${tableHtml}</div>`;
-                 } else {
-                    html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-                    if(step.B) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp B:</span><div class="matrix-display">${formatMatrix(step.B)}</div></div>`;
-                    if(step.d) html += `<div class="mt-2"><span class="font-semibold">Vector d:</span><div class="matrix-display">${formatMatrix(step.d)}</div></div>`;
-                    html += `</div>`;
-                 }
-             });
-             html += `</div></div>`;
-        } else { // Simple Iteration
+        if (firstStep.table) { // Dành cho Jacobi, Gauss-Seidel
+            // THAY ĐỔI TẠI ĐÂY
+            let errorHeader = 'Sai số ||Xₖ - Xₖ₋₁||∞'; // Mặc định cho Gauss-Seidel
+            if (method === 'jacobi') {
+                // Tiêu đề mới, chính xác hơn cho Jacobi dựa trên công thức sai số hậu nghiệm
+                errorHeader = 'Ước tính sai số'; 
+            }
+            tableHtml = createIterativeTable(firstStep.table, ['Lần lặp k', 'Nghiệm X_k', errorHeader]);
+        } else { // Dành cho Lặp đơn
             tableHtml = createIterativeTable(result.steps, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||']);
         }
 
@@ -2150,4 +2145,54 @@ function displayIterativeHptResults(result, method) {
     
     resultsArea.innerHTML = html;
     attachCopyMatrixEvents();
+}
+
+/**
+ * Hiển thị khối phân tích hội tụ dành riêng cho phương pháp Jacobi.
+ * Khối này được thêm vào cuối khu vực kết quả.
+ * @param {object} result - Đối tượng kết quả trả về từ server.
+ */
+function displayJacobiAnalysis(result) {
+    // Chỉ hoạt động nếu có đủ dữ liệu phân tích
+    if (result.contraction_coefficient === undefined || result.norm_used === undefined) {
+        return;
+    }
+
+    const resultsArea = document.getElementById('results-area');
+    if (!resultsArea) return;
+
+    const analysisDiv = document.createElement('div');
+    
+    let html = `<div class="mt-10">
+                    <h3 class="result-heading">Phân Tích Hội Tụ</h3>
+                    <div class="p-4 border rounded-lg bg-gray-50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">`;
+    
+    let dominanceText = '';
+    const normSymbol = result.norm_used === '1' ? '₁' : '∞';
+    if (result.dominance_type === 'row') {
+        dominanceText = `Ma trận chéo trội hàng. Sử dụng Chuẩn ${normSymbol}.`;
+    } else if (result.dominance_type === 'column') {
+        dominanceText = `Ma trận chéo trội cột. Sử dụng Chuẩn ${normSymbol}.`;
+    } else {
+        dominanceText = `Ma trận không chéo trội. Sử dụng Chuẩn ${normSymbol} mặc định.`;
+    }
+
+    html += `<div class="p-3 bg-white rounded-md shadow-sm">
+                <span class="font-medium text-gray-600">Điều kiện hội tụ</span>
+                <p class="text-base text-gray-800 mt-1">${dominanceText}</p>
+             </div>`;
+
+    html += `<div class="p-3 bg-white rounded-md shadow-sm">
+                <span class="font-medium text-gray-600">Hệ số co q = ||B||${normSymbol}</span>
+                <p class="font-mono text-xl text-blue-600 mt-1">${formatNumber(result.contraction_coefficient, 6)}</p>
+             </div>`;
+                 
+    html += `       </div>
+                </div>
+            </div>`;
+    
+    analysisDiv.innerHTML = html;
+    // Thêm khối phân tích vào cuối của khu vực kết quả
+    resultsArea.appendChild(analysisDiv);
 }
