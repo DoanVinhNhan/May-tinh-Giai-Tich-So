@@ -2194,5 +2194,5 @@ function displayJacobiAnalysis(result) {
     
     analysisDiv.innerHTML = html;
     // Thêm khối phân tích vào cuối của khu vực kết quả
-    resultsArea.appendChild(analysisDiv);
+    resultsArea.prepend(analysisDiv);
 }
