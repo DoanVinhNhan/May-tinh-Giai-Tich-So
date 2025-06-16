@@ -142,3 +142,5 @@ body {
 .toggle-table-btn:hover {
     color: #1d4ed8; /* Darker blue on hover */
 }
+.svd-tab-btn { margin-right: 8px; padding: 6px 16px; border-radius: 4px; background: #e0e7ff; border: none; }
+.svd-tab-btn:hover { background: #a5b4fc; }

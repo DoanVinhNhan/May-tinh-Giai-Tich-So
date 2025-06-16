@@ -1417,20 +1417,60 @@ function displayInverseResults(result, method) {
 
 
 // === CÁC HÀM HIỂN THỊ CŨ (GIỮ NGUYÊN) ===
+function showSvdTab(tab) {
+    document.querySelectorAll('.svd-tab').forEach(div => div.classList.add('hidden'));
+    document.getElementById('svd-tab-' + tab).classList.remove('hidden');
+}
 function displaySvdResults(result) {
     const resultsArea = document.getElementById('results-area');
-    let html = `<h3 class="result-heading">Kết Quả Phân Tích SVD (A = UΣVᵀ)</h3>`;
-    const uCols = result.U && result.U[0] ? result.U[0].length : 0;
-    const sigmaCols = result.Sigma && result.Sigma[0] ? result.Sigma[0].length : 0;
-    const vtCols = result.V_transpose && result.V_transpose[0] ? result.V_transpose[0].length : 0;
-
-    html += `<div class="mb-8">
-        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận U</h4><div class="matrix-display">${formatMatrix(result.U)}</div></div>
-        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Σ</h4><div class="matrix-display">${formatMatrix(result.Sigma)}</div></div>
-        <div class="mb-6"><h4 class="font-medium text-gray-700">Ma trận Vᵀ</h4><div class="matrix-display">${formatMatrix(result.V_transpose)}</div></div>
-    </div>`;
+    let html = `
+        <div class="flex space-x-2 mb-6">
+            <button type="button" onclick="showSvdTab('full')" class="svd-tab-btn" id="svd-btn-full">Dạng đầy đủ</button>
+            <button type="button" onclick="showSvdTab('reduced')" class="svd-tab-btn" id="svd-btn-reduced">Dạng rút gọn</button>
+            <button type="button" onclick="showSvdTab('sum')" class="svd-tab-btn" id="svd-btn-sum">Tổng thành phần</button>
+        </div>
+        <div id="svd-tab-full" class="svd-tab">
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">Ma trận U</div>
+                <div class="matrix-display">${formatMatrix(result.U)}</div>
+            </div>
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">Ma trận Σ</div>
+                <div class="matrix-display">${formatMatrix(result.Sigma)}</div>
+            </div>
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">Ma trận Vᵀ</div>
+                <div class="matrix-display">${formatMatrix(result.V_transpose)}</div>
+            </div>
+        </div>
+        <div id="svd-tab-reduced" class="svd-tab hidden">
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">U (rút gọn)</div>
+                <div class="matrix-display">${formatMatrix(result.U_reduced)}</div>
+            </div>
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">Σ (rút gọn)</div>
+                <div class="matrix-display">${formatMatrix(result.Sigma_reduced)}</div>
+            </div>
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="font-semibold text-indigo-700 mb-2">Vᵀ (rút gọn)</div>
+                <div class="matrix-display">${formatMatrix(result.Vt_reduced)}</div>
+            </div>
+        </div>
+        <div id="svd-tab-sum" class="svd-tab hidden">
+            ${(result.svd_sum_components || []).map((comp, i) => `
+                <div class="mb-2">
+                    <b>Thành phần ${i+1}:</b> σ = ${formatNumber(comp.sigma)}, 
+                        u = [${comp.u.map(v => formatNumber(v)).join(', ')}],
+                        v = [${comp.v.map(v => formatNumber(v)).join(', ')}]
+                </div>
+            `).join('')}
+        </div>
+        `;
     if (result.intermediate_steps) {
-        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3><div class="space-y-6">`;
+        if (result.intermediate_steps.A_transpose_A){
+            html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3><div class="space-y-6">`;
+        }
         if (result.intermediate_steps.A_transpose_A) {
             html += `<div><h4 class="font-medium text-gray-700">Ma trận AᵀA</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.A_transpose_A)}</div></div>`;
         }

@@ -84,12 +84,30 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-8, y_init=None
     Sigma = np.zeros((m, n))
     for i in range(len(singular_values)):
         Sigma[i, i] = singular_values[i]
+    # Tạo dạng rút gọn
+    diag_len = len(singular_values)
+    U_reduced = U[:, :diag_len]
+    Sigma_reduced = Sigma[:diag_len, :diag_len]
+    Vt_reduced = V.T[:diag_len, :]
+    # Tổng thành phần
+    svd_sum_components = [
+        {
+            "sigma": float(singular_values[i]),
+            "u": U[:, i].tolist(),
+            "v": V[:, i].tolist()
+        }
+        for i in range(diag_len)
+    ]
     # Trả về kết quả
     return {
         'success': True,
         'U': zero_small(U).tolist(),
         'Sigma': zero_small(Sigma).tolist(),
         'V_transpose': zero_small(V.T).tolist(),
+        'U_reduced': zero_small(U_reduced).tolist(),
+        'Sigma_reduced': zero_small(Sigma_reduced).tolist(),
+        'Vt_reduced': zero_small(Vt_reduced).tolist(),
+        'svd_sum_components': svd_sum_components,
         'intermediate_steps': {
             'A_transpose_A': zero_small(ATA).tolist(),
             'singular_values': [float(s) for s in singular_values],
@@ -113,13 +131,30 @@ def svd_numpy(A):
         Sigma = np.zeros((m, n))
         diag_len = min(m, n, s.shape[0])
         Sigma[:diag_len, :diag_len] = np.diag(s[:diag_len])
+        
+        # Giảm bớt kích thước ma trận theo số lượng giá trị kỳ dị
+        U_reduced = U[:, :diag_len]
+        Sigma_reduced = Sigma[:diag_len, :diag_len]
+        Vt_reduced = Vt[:diag_len, :]
+        
         return {
             "success": True,
             "U": zero_small(U).tolist(),
             "Sigma": zero_small(Sigma).tolist(),
             "V_transpose": zero_small(Vt).tolist(),
+            "U_reduced": zero_small(U_reduced).tolist(),
+            "Sigma_reduced": zero_small(Sigma_reduced).tolist(),
+            "Vt_reduced": zero_small(Vt_reduced).tolist(),
+            "svd_sum_components": [
+                {
+                    "sigma": float(sigma_i),
+                    "u": u_i.tolist(),
+                    "v": v_i.tolist()
+                }
+                for sigma_i, u_i, v_i in zip(s, U.T, Vt)
+            ],
             "intermediate_steps": {
-                "singular_values": zero_small(s).tolist()
+                "note": "Không có các bước trung gian chi tiết khi dùng numpy.linalg.svd."
             }
         }
     except Exception as e:
