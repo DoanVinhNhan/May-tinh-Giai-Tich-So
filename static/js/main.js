@@ -44,7 +44,7 @@ function setupDisplaySettingsEvents() {
     toleranceInput.addEventListener('input', (e) => {
         const valStr = e.target.value;
         // Cho phép các định dạng khoa học như "1e-15"
-        if (/^-?\d*(\.\d+)?(e-?\d+)?$/i.test(valStr)) {
+        if (/^-?\d*(\.\d+)?(e-?d+)?$/i.test(valStr)) {
             const val = parseFloat(valStr);
             if (!isNaN(val) && val >= 0) {
                 zeroTolerance = val;
@@ -458,6 +458,9 @@ async function handleCalculation(endpoint, body) {
             displayIterativeHptResults(result, key);
             if (key === 'jacobi') {
                 displayJacobiAnalysis(result);
+            }
+            if (key === 'gauss-seidel') {
+                displayGaussSeidelAnalysis(result);
             }
             return;
         }
@@ -1194,7 +1197,53 @@ function displayEigenPowerResults(result) {
     resultsArea.innerHTML = html;
     attachCopyMatrixEvents();
 }
-// --- START: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
+
+function displayJacobiAnalysis(result) {
+    // Chỉ hoạt động nếu có đủ dữ liệu phân tích
+    if (result.contraction_coefficient === undefined || result.norm_used === undefined) {
+        return;
+    }
+
+    const resultsArea = document.getElementById('results-area');
+    if (!resultsArea) return;
+
+    const analysisDiv = document.createElement('div');
+    
+    let html = `<div class="mt-10">
+                    <h3 class="result-heading">Phân Tích Hội Tụ</h3>
+                    <div class="p-4 border rounded-lg bg-gray-50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">`;
+    
+    let dominanceText = '';
+    const normSymbol = result.norm_used === '1' ? '₁' : '∞';
+    if (result.dominance_type === 'row') {
+        dominanceText = `Ma trận chéo trội hàng. Sử dụng Chuẩn ${normSymbol}.`;
+    } else if (result.dominance_type === 'column') {
+        dominanceText = `Ma trận chéo trội cột. Sử dụng Chuẩn ${normSymbol}.`;
+    } else {
+        dominanceText = `Ma trận không chéo trội. Sử dụng Chuẩn ${normSymbol} mặc định.`;
+    }
+
+    html += `<div class="p-3 bg-white rounded-md shadow-sm">
+                <span class="font-medium text-gray-600">Điều kiện hội tụ</span>
+                <p class="text-base text-gray-800 mt-1">${dominanceText}</p>
+             </div>`;
+
+    html += `<div class="p-3 bg-white rounded-md shadow-sm">
+                <span class="font-medium text-gray-600">Hệ số co q = ||B||${normSymbol}</span>
+                <p class="font-mono text-xl text-blue-600 mt-1">${formatNumber(result.contraction_coefficient, 6)}</p>
+             </div>`;
+                 
+    html += `       </div>
+                </div>
+            </div>`;
+    
+    analysisDiv.innerHTML = html;
+    // Thêm khối phân tích vào cuối của khu vực kết quả
+    resultsArea.prepend(analysisDiv);
+}
+
+// --- START: CODE MỚI ---
 function displayInverseResults(result, method) {
     const resultsArea = document.getElementById('results-area');
     let html = `<h3 class="result-heading">Kết Quả Ma Trận Nghịch Đảo A⁻¹</h3>`;
@@ -1202,6 +1251,22 @@ function displayInverseResults(result, method) {
     if (result.message) {
         html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-blue-50 rounded-lg shadow-inner">${result.message}</div>`;
     }
+
+    // --- BỔ SUNG: Hiển thị thông tin Jacobi Inverse ---
+    if (method === 'jacobi') {
+        html += `<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-3 bg-gray-50 rounded shadow">
+                <div><b>Hệ số co:</b> <span class="font-mono">${typeof result.contraction_coefficient !== 'undefined' ? result.contraction_coefficient.toFixed(6) : ''}</span></div>
+                <div><b>Chuẩn dừng:</b> <span class="font-mono">${result.norm_used || ''}</span></div>
+                <div><b>Chéo trội:</b> <span class="font-mono">${result.dominance_type || ''}</span></div>
+            </div>
+            <div class="p-3 bg-gray-50 rounded shadow">
+                <div><b>Công thức dừng:</b> <span class="font-mono">${result.stop_formula || ''}</span></div>
+                <div><b>X₀:</b> <span class="font-mono">${result.x0_label || ''}</span></div>
+            </div>
+        </div>`;
+    }
+    // --- END BỔ SUNG ---
 
     if (result.inverse) {
         html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Ma trận nghịch đảo A⁻¹:</h4><div class="matrix-display">${formatMatrix(result.inverse)}</div></div>`;
@@ -1222,7 +1287,7 @@ function displayInverseResults(result, method) {
             
             // === THAY ĐỔI TẠI ĐÂY ===
             // 1. Xử lý các tham số thông thường
-            ['L', 'U', 'P', 'M', 'inv_M', 'theta'].forEach(key => {
+            ['L', 'U', 'P', 'M', 'inv_M', 'theta', 'L_inv', 'U_inv'].forEach(key => {
                 if (step[key] !== undefined) {
                     let labelHtml = `<span class="font-semibold">${key}:</span>`;
                     html += `<div class="mt-2">${labelHtml}`;
@@ -1247,45 +1312,68 @@ function displayInverseResults(result, method) {
                 html += `<div class="space-y-6 mt-4">`;
                 step.iterations.forEach(iter_step => {
                     html += `<div class="p-4 border rounded-lg bg-gray-50/50">
-                                <p class="font-semibold text-gray-800">Bước lặp ${iter_step.iteration_number}</p>
-                                <div class="mt-2">
-                                    <p class="font-medium text-sm text-gray-600">Ma trận X<sub>${iter_step.iteration_number}</sub>:</p>
-                                    <div class="matrix-display">${formatMatrix(iter_step.matrix_Xk)}</div>
-                                </div>
-                                <div class="mt-2">
-                                    <p class="font-medium text-sm text-gray-600">Sai số:</p>
-                                    <p class="font-mono text-center bg-gray-100 p-2 rounded-md">||Xₖ - Xₖ₋₁||_fro ≈ ${formatNumber(iter_step.error_fro, 8)}</p>
-                                </div>
-                             </div>`;
+                        <p class="font-semibold text-gray-800">Bước lặp ${iter_step.iteration_number}</p>
+                        <div class="mt-2">
+                            <p class="font-medium text-sm text-gray-600">Ma trận X<sub>${iter_step.iteration_number}</sub>:</p>
+                            <div class="matrix-display">${formatMatrix(iter_step.matrix_Xk)}</div>
+                        </div>
+                        <div class="mt-2">
+                            <p class="font-medium text-sm text-gray-600">Sai số chuẩn 2:</p>
+                            <p class="font-mono text-center bg-gray-100 p-2 rounded-md">||Xₖ - Xₖ₋₁||₂ ≈ ${formatNumber(iter_step.error_2, 8)}</p>
+                        </div>
+                        <div class="mt-2">
+                            <p class="font-medium text-sm text-gray-600">Sai số hậu nghiệm:</p>
+                            <p class="font-mono text-center bg-gray-100 p-2 rounded-md">q/(1-q)·||Xₖ - Xₖ₋₁||₂ ≈ ${formatNumber(iter_step.estimated_error, 8)}</p>
+                        </div>
+                    </div>`;
                 });
                 html += `</div>`;
             }
             
             if (step.table) {
-                html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr>`;
-                step.table.headers.forEach(header => {
-                    html += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">${header}</th>`;
-                });
-                html += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
-                step.table.rows.forEach(row => {
-                    html += `<tr>`;
-                    row.forEach(cell => {
-                         html += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${cell}</td>`;
-                    });
+                // Nếu là bảng lặp Gauss-Seidel, Jacobi, Newton, hiển thị tiêu đề đúng công thức
+                let errorHeader = 'Sai số';
+                let aposterioriHeader = '';
+                if (method === 'jacobi') {
+                    errorHeader = 'q/(1-q)·||Xₖ₊₁ - Xₖ||';
+                    aposterioriHeader = '||Xₖ₊₁ - Xₖ||';
+                } else if (method === 'newton') {
+                    errorHeader = 'q/(1-q)·||Xₖ₊₁ - Xₖ||₂';
+                    aposterioriHeader = '||Xₖ₊₁ - Xₖ||₂';
+                } else if (method === 'gauss-seidel') {
+                    errorHeader = 'q/[(1-s)(1-q)]·||Xₖ₊₁ - Xₖ||';
+                    aposterioriHeader = '||Xₖ₊₁ - Xₖ||';
+                }
+                html += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-4 py-2">Lần lặp</th>
+                            <th class="px-4 py-2">X<sub>k</sub></th>`;
+                if (aposterioriHeader) {
+                    html += `<th class="px-4 py-2">${aposterioriHeader}</th>`;
+                }
+                html += `<th class="px-4 py-2">${errorHeader}</th>
+                        </tr></thead><tbody>`;
+                step.table.forEach(row => {
+                    html += `<tr>
+                            <td class="px-4 py-2 text-center">${row.k}</td>
+                            <td class="px-4 py-2 font-mono">${formatMatrix(row.x_k)}</td>`;
+                    if (aposterioriHeader) {
+                        html += `<td class="px-4 py-2 text-center">${row.error_norm !== undefined ? formatNumber(row.error_norm, 8) : ''}</td>`;
+                    }
+                    html += `<td class="px-4 py-2 text-center">${row.error_aposteriori !== undefined && row.error_aposteriori !== null ? formatNumber(row.error_aposteriori, 8) : formatNumber(row.error, 8)}</td>`;
                     html += `</tr>`;
                 });
-                 html += `</tbody></table></div>`;
+                html += `</tbody></table></div>`;
             }
 
             html += `</div>`;
         });
-        html += `</div></div>`;
+        html += `</div>`;
     }
+
     resultsArea.innerHTML = html;
-
     attachCopyMatrixEvents();
-
+    
     // === THAY ĐỔI TẠI ĐÂY ===
     // 3. Tìm khối nổi bật và render KaTeX vào đó
     const qProminentBlock = document.getElementById('q-prominent-block');
@@ -1296,23 +1384,17 @@ function displayInverseResults(result, method) {
         const qValueFormatted = formatNumber(qValue, 6);
         const latexString = String.raw`||I - AX_0||_2 \approx ${qValueFormatted}`;
         try {
-            katex.render(latexString, qProminentBlock, {
+            katex.render(latexString, errorFormulaEl, {
                 throwOnError: false,
-                displayMode: true
+                displayMode: false
             });
-            // Thêm một thông báo nhỏ để giải thích ý nghĩa của giá trị q
-            if (qValue < 1) {
-                qProminentBlock.insertAdjacentHTML('afterend', '<p class="text-xs text-green-700 mt-2">✓ Điều kiện hội tụ được thỏa mãn (giá trị < 1).</p>');
-            } else {
-                 qProminentBlock.insertAdjacentHTML('afterend', '<p class="text-xs text-red-600 mt-2">✗ CẢNH BÁO: Điều kiện hội tụ không được thỏa mãn (giá trị ≥ 1).</p>');
-            }
         } catch (e) {
-            console.error("Lỗi render KaTeX cho khối 'q':", e);
-            qProminentBlock.textContent = `||I - AX_0||_2 ≈ ${qValueFormatted}`;
+            console.error("Lỗi render KaTeX", e);
+            errorFormulaEl.textContent = "Công thức lỗi...";
         }
     }
 }
-// --- END: HÀM HIỂN THỊ KẾT QUẢ MỚI ---
+// --- END: CODE MỚI ---
 
 
 // === CÁC HÀM HIỂN THỊ CŨ (GIỮ NGUYÊN) ===
@@ -1410,7 +1492,7 @@ function displayLuResults(result) {
     const resultsArea = document.getElementById('results-area');
     let html = displayGenericHptResults('Kết Quả Giải Hệ Bằng Phân Tách LU', result);
     if (result.decomposition && (result.decomposition.L || result.decomposition.U || result.decomposition.P)) {
-        html += `<div class="mt-10"><h3 class="result-heading">Các Ma Trận Phân Rã</h3>`;
+               html += `<div class="mt-10"><h3 class="result-heading">Các Ma Trận Phân Rã</h3>`;
 
         // Hiển thị ma trận P nếu có (thường là ma trận hoán vị)
         if (result.decomposition.P) {
@@ -1559,7 +1641,7 @@ function displayDanilevskyResults(result) {
             html += `
                 <div class="mt-8 border-t pt-6">
                     <h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Đa thức đặc trưng:</h4>
-                    <div class="matrix-display text-center text-xl font-mono !bg-indigo-50 !text-indigo-800">
+                    <div class="matrix-display text-center text-xl font-mono !bg-indigo-100 !text-indigo-800">
                         ${polyString}
                     </div>
                 </div>
@@ -1750,21 +1832,17 @@ function displayNonlinearSystemResults(result) {
 
     if (result.J_max_vals) {
         html += `<div class="mt-8 p-4 border rounded-lg bg-gray-50">
-                    <h4 class="font-semibold text-gray-700 text-lg mb-3 text-center">Phân tích hội tụ (PP Lặp đơn)</h4>
-                    <div class="space-y-4">
-                        <div>
-                            <p class="font-medium text-gray-600 mb-2">Ma trận GTLN của các đạo hàm riêng max|∂φ_i/∂x_j|:</p>
-                            <div class="matrix-display">${formatMatrix(result.J_max_vals, 6)}</div>
-                        </div>
-                        <div class="text-center space-x-4 md:space-x-8 text-sm md:text-base">
-                            <span class="font-medium">Chuẩn hàng (chuẩn ∞): <code class="p-1 bg-gray-200 rounded">${formatNumber(result.max_row_sum, 6)}</code></span>
-                            <span class="font-medium">Chuẩn cột (chuẩn 1): <code class="p-1 bg-gray-200 rounded">${formatNumber(result.max_col_sum, 6)}</code></span>
-                        </div>
-                        <div class="text-center font-bold text-lg p-2 bg-blue-100 text-blue-800 rounded-md">
-                            Hệ số co K = ${formatNumber(result.contraction_factor_K, 6)}
-                            <span class="text-base font-medium">(tính theo chuẩn ${result.norm_used_for_K === '1' ? '1' : 'vô cùng'})</span>
-                        </div>
-                    </div>
+                    <h4 class="font-semibold text-gray-700 text-lg mb-3 text-center">Phân Tích Hội Tụ</h4>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                         <div class="p-3 bg-gray-100 rounded-md">
+                            <span class="font-medium">Chuẩn ma trận lặp ||B||${normSymbol}</span>
+                            <p class="font-mono text-xl">${formatNumber(result.max_row_sum, 6)}</p>
+                         </div>
+                         <div class="p-3 bg-gray-100 rounded-md">
+                            <span class="font-medium">Ngưỡng dừng thực tế</span>
+                            <p class="font-mono text-xl">${formatNumber(result.stopping_threshold, 8)}</p>
+                         </div>
+                     </div>
                  </div>`;
     }
 
@@ -1823,62 +1901,6 @@ function displayNonlinearSystemResults(result) {
     }
 }
 
-function displayIterativeHptResults(result, method) {
-    const resultsArea = document.getElementById('results-area');
-    let html = `<h3 class="result-heading">Kết Quả Giải Hệ Bằng ${method.charAt(0).toUpperCase() + method.slice(1)}</h3>`;
-
-    if (result.message) {
-        html += `<div class="text-center font-medium text-lg mb-6 p-4 bg-blue-50 rounded-lg shadow-inner">${result.message}</div>`;
-    }
-    if (result.warning) {
-        html += `<div class="text-center font-medium text-md mb-6 p-3 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">${result.warning}</div>`;
-    }
-
-    if (result.solution) {
-        html += `<div class="mb-8"><h4 class="font-semibold text-gray-700 text-center text-xl mb-2">Nghiệm X:</h4><div class="matrix-display">${formatMatrix(result.solution)}</div></div>`;
-    }
-
-    if (result.steps && result.steps.length > 0) {
-        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Trung Gian</h3><div class="space-y-8">`;
-        result.steps.forEach(step => {
-            if (step.table) { // Đây là bảng lặp
-                html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-                html += `<div class="overflow-x-auto"><table class=" collapsible-table min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Lần lặp k</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Nghiệm X_k</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Sai số ||Xₖ - Xₖ₋₁||∞</th>
-                    </tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
-                step.table.forEach(row => {
-                    let x_k_formatted;
-                    // Kiểm tra xem row.x_k là mảng 1D (vector) hay 2D (ma trận)
-                    if (Array.isArray(row.x_k[0])) {
-                        // Nếu là ma trận, dùng formatMatrix để hiển thị
-                        x_k_formatted = formatMatrix(row.x_k);
-                    } else {
-                        // Nếu là vector, dùng logic cũ
-                        x_k_formatted = `[${row.x_k.map(v => formatNumber(v)).join(', ')}]`;
-                    }
-                    html += `<tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${row.k}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${x_k_formatted}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">${formatNumber(row.error)}</td>
-                    </tr>`;
-                });
-                html += `</tbody></table></div></div>`;
-            } else { // Đây là các ma trận B, d
-                html += `<div><h4 class="font-medium text-gray-700 mb-2">${step.message}</h4>`;
-                if(step.B) html += `<div class="mt-2"><span class="font-semibold">Ma trận lặp B:</span><div class="matrix-display">${formatMatrix(step.B)}</div></div>`;
-                if(step.d) html += `<div class="mt-2"><span class="font-semibold">Vector d:</span><div class="matrix-display">${formatMatrix(step.d)}</div></div>`;
-                html += `</div>`;
-            }
-        });
-        html += `</div></div>`;
-    }
-    resultsArea.innerHTML = html;
-
-    attachCopyMatrixEvents();
-}
 function setupMatrixSolveIterativeEvents() {
     // Logic chuyển tab
     const tabs = document.querySelectorAll('.iter-hpt-tab');
@@ -1979,14 +2001,14 @@ function displayPolynomialResults(result) {
     
     // Bước 1: Khoảng chứa nghiệm (giữ nguyên)
     html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
-                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 1: Tìm khoảng chứa nghiệm</h4>
+                <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Bước 1: Tìm khoảng chứa nghiệm</h4>
                 <p class="text-gray-600">Dựa trên các hệ số, tất cả các nghiệm thực (nếu có) của đa thức sẽ nằm trong khoảng:</p>
                 <p class="text-center font-bold text-xl text-purple-700 my-2">[${formatNumber(result.bounds[0])}, ${formatNumber(result.bounds[1])}]</p>
              </div>`;
 
     // Bước 2: Phân ly nghiệm (giữ nguyên)
     html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
-                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 2: Phân ly nghiệm</h4>
+                <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Bước 2: Phân ly nghiệm</h4>
                 <p class="text-gray-600">Tìm các điểm cực trị (nghiệm của đạo hàm) để chia khoảng lớn thành các khoảng nhỏ hơn, mỗi khoảng chứa tối đa 1 nghiệm.</p>
                 <p class="text-gray-800 mt-2">Các điểm cực trị thực tìm được: <span class="font-mono">${result.critical_points.length > 0 ? result.critical_points.map(p => formatNumber(p)).join(', ') : 'Không có'}</span></p>
                 <p class="text-gray-800 mt-2">Các khoảng sẽ được xét nghiệm: <span class="font-mono">${result.search_intervals.map(iv => `[${formatNumber(iv[0])}, ${formatNumber(iv[1])}]`).join('; ')}</span></p>
@@ -1994,7 +2016,7 @@ function displayPolynomialResults(result) {
              
     // Bước 3: Tìm nghiệm (giữ nguyên)
     html += `<div class="mb-8 p-4 border rounded-lg bg-gray-50">
-                <h4 class="font-semibold text-gray-700 text-lg mb-2">Bước 3: Tìm nghiệm trong từng khoảng</h4>`;
+                <h4 class="font-semibold text-gray-700 text-lg mb-2 text-center">Bước 3: Tìm nghiệm trong từng khoảng</h4>`;
 
     if (result.found_roots.length === 0) {
         html += `<p class="text-center text-gray-500 font-medium mt-4">Không tìm thấy nghiệm thực nào trong các khoảng trên.</p>`;
@@ -2010,13 +2032,7 @@ function displayPolynomialResults(result) {
                             <summary class="cursor-pointer text-sm font-medium text-purple-600 hover:text-purple-800">Xem các bước lặp (Chia đôi)</summary>
                             <div class="overflow-x-auto mt-2">
                                 <table class=" collapsible-table min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead class="bg-gray-100"><tr>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">k</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">aₖ</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">bₖ</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">cₖ = (aₖ+bₖ)/2</th>
-                                        <th class="px-4 py-2 text-left font-medium text-gray-600">f(cₖ)</th>
-                                    </tr></thead>
+                                    <thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left font-medium text-gray-600">k</th><th class="px-4 py-2 text-left font-medium text-gray-600">aₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">bₖ</th><th class="px-4 py-2 text-left font-medium text-gray-600">cₖ = (aₖ+bₖ)/2</th><th class="px-4 py-2 text-left font-medium text-gray-600">f(cₖ)</th></tr></thead>
                                     <tbody class="bg-white divide-y divide-gray-200">`;
             root_info.bisection_steps.forEach(step => {
                 html += `<tr>
@@ -2128,12 +2144,40 @@ function displayIterativeHptResults(result, method) {
 
         if (firstStep.table) { // Dành cho Jacobi, Gauss-Seidel
             // THAY ĐỔI TẠI ĐÂY
-            let errorHeader = 'Sai số ||Xₖ - Xₖ₋₁||∞'; // Mặc định cho Gauss-Seidel
+            
+            let errorHeader = 'Sai số';
+            let aposterioriHeader = '';
             if (method === 'jacobi') {
-                // Tiêu đề mới, chính xác hơn cho Jacobi dựa trên công thức sai số hậu nghiệm
-                errorHeader = 'Ước tính sai số'; 
+                errorHeader = 'q/(1-q)·||Xₖ₊₁ - Xₖ||';
+                aposterioriHeader = '||Xₖ₊₁ - Xₖ||';
+            } else if (method === 'newton') {
+                errorHeader = 'q/(1-q)·||Xₖ₊₁ - Xₖ||₂';
+                aposterioriHeader = '||Xₖ₊₁ - Xₖ||₂';
+            } else if (method === 'gauss-seidel') {
+                errorHeader = 'q/[(1-s)(1-q)]·||Xₖ₊₁ - Xₖ||';
+                aposterioriHeader = '||Xₖ₊₁ - Xₖ||';
             }
-            tableHtml = createIterativeTable(firstStep.table, ['Lần lặp k', 'Nghiệm X_k', errorHeader]);
+            tableHtml = `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-4 py-2">Lần lặp</th>
+                            <th class="px-4 py-2">X<sub>k</sub></th>`;
+            if (aposterioriHeader) {
+                tableHtml += `<th class="px-4 py-2">${aposterioriHeader}</th>`;
+            }
+            tableHtml += `<th class="px-4 py-2">${errorHeader}</th>
+                        </tr></thead><tbody>`;
+            firstStep.table.forEach(row => {
+                tableHtml += `<tr>
+                            <td class="px-4 py-2 text-center">${row.k}</td>
+                            <td class="px-4 py-2 font-mono">${formatMatrix(row.x_k)}</td>`;
+                if (aposterioriHeader) {
+                    tableHtml += `<td class="px-4 py-2 text-center">${row.error_norm !== undefined ? formatNumber(row.error_norm, 8) : ''}</td>`;
+                }
+                tableHtml += `<td class="px-4 py-2 text-center">${row.error_aposteriori !== undefined && row.error_aposteriori !== null ? formatNumber(row.error_aposteriori, 8) : formatNumber(row.error, 8)}</td>`;
+                tableHtml += `</tr>`;
+            });
+            tableHtml += `</tbody></table></div>`;
+
         } else { // Dành cho Lặp đơn
             tableHtml = createIterativeTable(result.steps, ['Lần lặp k', 'Nghiệm X_k', 'Sai số ||Xₖ - Xₖ₋₁||']);
         }
@@ -2147,52 +2191,55 @@ function displayIterativeHptResults(result, method) {
     attachCopyMatrixEvents();
 }
 
-/**
- * Hiển thị khối phân tích hội tụ dành riêng cho phương pháp Jacobi.
- * Khối này được thêm vào cuối khu vực kết quả.
- * @param {object} result - Đối tượng kết quả trả về từ server.
- */
-function displayJacobiAnalysis(result) {
-    // Chỉ hoạt động nếu có đủ dữ liệu phân tích
-    if (result.contraction_coefficient === undefined || result.norm_used === undefined) {
-        return;
+function displayGaussSeidelAnalysis(result) {
+        if (result.contraction_coefficient_q === undefined) {
+            return;
+        }
+
+        const resultsArea = document.getElementById('results-area');
+        if (!resultsArea) return;
+
+        const analysisDiv = document.createElement('div');
+        const normSymbol = result.norm_used === '1' ? '₁' : '∞';
+        let dominanceText = `Ma trận ${result.dominance_type}. Sử dụng Chuẩn ${result.norm_used}.`;
+
+        let html = `<div class="mt-10">
+                        <h3 class="result-heading">Phân Tích Hội Tụ</h3>
+                        <div class="p-4 border rounded-lg bg-gray-50">
+                            <div class="p-3 mb-4 bg-white rounded-md shadow-sm text-center">
+                                <span class="font-medium text-gray-600">Điều kiện hội tụ</span>
+                                <p class="text-base text-gray-800 mt-1">${dominanceText}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                                <div class="p-3 bg-white rounded-md shadow-sm">
+                                    <span class="font-medium text-gray-600">Hệ số co q</span>
+                                    <p class="font-mono text-xl text-blue-600 mt-1">${formatNumber(result.contraction_coefficient_q, 6)}</p>
+                                </div>
+                                <div class="p-3 bg-white rounded-md shadow-sm">
+                                    <span class="font-medium text-gray-600">Hệ số s</span>
+                                    <p class="font-mono text-xl text-blue-600 mt-1">${formatNumber(result.contraction_coefficient_s, 6)}</p>
+                                </div>
+                            </div>
+                            <div class="text-center mt-4 text-sm text-gray-500">
+                               Điều kiện dừng: <span id="error-formula-katex-gs"></span>
+                            </div>
+                        </div>
+                    </div>`;
+
+        analysisDiv.innerHTML = html;
+        resultsArea.prepend(analysisDiv); // Đưa lên đầu khu vực kết quả
+
+        const errorFormulaEl = document.getElementById('error-formula-katex-gs');
+        if (errorFormulaEl && window.katex) {
+            const latexString = String.raw`\frac{q}{(1-s)(1-q)}\|X_k - X_{k-1}\| < \epsilon`;
+            try {
+                katex.render(latexString, errorFormulaEl, {
+                    throwOnError: false,
+                    displayMode: false
+                });
+            } catch (e) {
+                console.error("Lỗi render KaTeX", e);
+                errorFormulaEl.textContent = "Công thức lỗi...";
+            }
+        }
     }
-
-    const resultsArea = document.getElementById('results-area');
-    if (!resultsArea) return;
-
-    const analysisDiv = document.createElement('div');
-    
-    let html = `<div class="mt-10">
-                    <h3 class="result-heading">Phân Tích Hội Tụ</h3>
-                    <div class="p-4 border rounded-lg bg-gray-50">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">`;
-    
-    let dominanceText = '';
-    const normSymbol = result.norm_used === '1' ? '₁' : '∞';
-    if (result.dominance_type === 'row') {
-        dominanceText = `Ma trận chéo trội hàng. Sử dụng Chuẩn ${normSymbol}.`;
-    } else if (result.dominance_type === 'column') {
-        dominanceText = `Ma trận chéo trội cột. Sử dụng Chuẩn ${normSymbol}.`;
-    } else {
-        dominanceText = `Ma trận không chéo trội. Sử dụng Chuẩn ${normSymbol} mặc định.`;
-    }
-
-    html += `<div class="p-3 bg-white rounded-md shadow-sm">
-                <span class="font-medium text-gray-600">Điều kiện hội tụ</span>
-                <p class="text-base text-gray-800 mt-1">${dominanceText}</p>
-             </div>`;
-
-    html += `<div class="p-3 bg-white rounded-md shadow-sm">
-                <span class="font-medium text-gray-600">Hệ số co q = ||B||${normSymbol}</span>
-                <p class="font-mono text-xl text-blue-600 mt-1">${formatNumber(result.contraction_coefficient, 6)}</p>
-             </div>`;
-                 
-    html += `       </div>
-                </div>
-            </div>`;
-    
-    analysisDiv.innerHTML = html;
-    // Thêm khối phân tích vào cuối của khu vực kết quả
-    resultsArea.prepend(analysisDiv);
-}

@@ -1,85 +1,129 @@
 import numpy as np
+import traceback
 
 def solve_gauss_seidel(matrix_a, matrix_b, x0, eps=1e-5, max_iter=100):
     """
-    Giải hệ phương trình Ax=B bằng phương pháp lặp Gauss-Seidel,
-    xử lý toàn bộ ma trận B cùng lúc bằng các phép toán trên ma trận.
+    Giải hệ phương trình Ax=B bằng phương pháp lặp Gauss-Seidel.
+    - Yêu cầu ma trận A phải chéo trội hàng hoặc cột.
+    - Tự động chọn chuẩn (1 hoặc vô cùng) và tính hệ số co (q, s) tương ứng.
+    - Điều kiện dừng dựa trên công thức sai số hậu nghiệm.
     """
     try:
+        # --- Khởi tạo và kiểm tra đầu vào ---
         n = matrix_a.shape[0]
         if n != matrix_a.shape[1]:
             return {"success": False, "error": "Ma trận A phải là ma trận vuông."}
-
-        # Đảm bảo matrix_b và x0 là ma trận 2D để xử lý nhất quán
         if matrix_b.ndim == 1:
             matrix_b = matrix_b.reshape(-1, 1)
         if x0.ndim == 1:
             x0 = x0.reshape(-1, 1)
+        
+        diag_elements = np.diag(matrix_a)
+        if np.any(np.isclose(diag_elements, 0)):
+            return {"success": False, "error": "Ma trận có phần tử trên đường chéo chính bằng 0, không thể thực hiện phép chia."}
 
-        # Kiểm tra kích thước các ma trận có tương thích không
-        if matrix_a.shape[0] != matrix_b.shape[0] or matrix_a.shape[0] != x0.shape[0] or matrix_b.shape[1] != x0.shape[1]:
-            return {"success": False, "error": "Kích thước các ma trận A, B, và x0 không tương thích."}
+        # --- Kiểm tra chéo trội hàng và cột nghiêm ngặt ---
+        diag_abs = np.abs(diag_elements)
+        row_sum_off_diag = np.sum(np.abs(matrix_a), axis=1) - diag_abs
+        col_sum_off_diag = np.sum(np.abs(matrix_a), axis=0) - diag_abs
 
-        # Kiểm tra điều kiện chéo trội (điều kiện đủ để hội tụ)
-        diag_abs = np.abs(np.diag(matrix_a))
-        sum_abs_off_diag = np.sum(np.abs(matrix_a), axis=1) - diag_abs
-        warning_message = None
-        if not np.all(diag_abs > sum_abs_off_diag):
-            warning_message = "Cảnh báo: Ma trận không chéo trội hàng. Phương pháp Gauss-Seidel có thể không hội tụ."
+        is_row_dominant = np.all(diag_abs > row_sum_off_diag)
+        is_col_dominant = np.all(diag_abs > col_sum_off_diag)
 
-        # --- Bắt đầu quá trình lặp ma trận ---
-        x_k = x0.copy().astype(float)  # Dùng float để đảm bảo tính toán chính xác
+        s, q, norm, dominance_type = 0, 0, 0, ""
 
+        if is_row_dominant:
+            dominance_type = "chéo trội hàng"
+            norm = np.inf
+            s = 0  # Theo công thức (1.51) 
+            
+            # Tính q cho trường hợp chéo trội hàng theo (1.51) 
+            q_num = np.zeros(n)
+            q_den = np.zeros(n)
+            for i in range(n):
+                q_num[i] = np.sum(np.abs(matrix_a[i, :i]))
+                q_den[i] = np.abs(matrix_a[i, i]) - np.sum(np.abs(matrix_a[i, i+1:]))
+            q_den[np.isclose(q_den, 0)] = 1e-15 
+            q = np.max(q_num / q_den)
+
+        elif is_col_dominant:
+            dominance_type = "chéo trội cột"
+            norm = 1
+            
+            # Tính s cho trường hợp chéo trội cột theo (1.52) 
+            s_num = np.zeros(n)
+            for j in range(n):
+                s_num[j] = np.sum(np.abs(matrix_a[j+1:, j]))
+            s = np.max(s_num / diag_abs)
+            
+            # Tính q cho trường hợp chéo trội cột theo (1.52) 
+            q_num = np.zeros(n)
+            q_den = np.zeros(n)
+            for j in range(n):
+                q_num[j] = np.sum(np.abs(matrix_a[:j, j]))
+                q_den[j] = np.abs(matrix_a[j, j]) - np.sum(np.abs(matrix_a[j+1:, j]))
+            q_den[np.isclose(q_den, 0)] = 1e-15
+            q = np.max(q_num / q_den)
+        
+        else:
+            return {
+                "success": False,
+                "error": "Ma trận không chéo trội hàng hoặc cột. Không thể đảm bảo hội tụ cho phương pháp Gauss-Seidel."
+            }
+
+        # --- Tính toán hệ số cho điều kiện dừng ---
+        denominator = (1 - s) * (1 - q)
+        if np.isclose(denominator, 0):
+             return {"success": False, "error": f"Hệ số q={q:.4f} hoặc s={s:.4f} không hợp lệ, gây lỗi chia cho 0 trong công thức sai số."}
+        stopping_factor = q / denominator
+
+        # --- Quá trình lặp ---
+        x_k = x0.copy().astype(float)
         table_rows = []
+        final_error = float('inf')
 
         for i in range(max_iter):
             x_prev = x_k.copy()
-
-            # Cập nhật từng HÀNG của ma trận nghiệm X
             for j in range(n):
-                # sum1 là tổng các A[j,k]*X[k,:] với k < j (dùng giá trị X mới cập nhật)
                 sum1 = np.dot(matrix_a[j, :j], x_k[:j, :])
-                
-                # sum2 là tổng các A[j,k]*X[k,:] với k > j (dùng giá trị X của bước lặp trước)
                 sum2 = np.dot(matrix_a[j, j+1:], x_prev[j+1:, :])
-
-                # Kiểm tra phần tử trên đường chéo chính
-                if matrix_a[j, j] == 0:
-                    return {"success": False, "error": f"Phần tử trên đường chéo chính A[{j+1},{j+1}] bằng 0, không thể chia."}
-
-                # Cập nhật cả hàng j của ma trận x_k cùng một lúc
                 x_k[j, :] = (matrix_b[j, :] - sum1 - sum2) / matrix_a[j, j]
-
-            # Tính sai số. np.linalg.norm(..., np.inf) cho ma trận là chuẩn tổng hàng lớn nhất.
-            error = np.linalg.norm(x_k - x_prev, np.inf)
             
-            # Ghi lại các bước, x_k bây giờ là toàn bộ ma trận X ở bước lặp i
+            # Sử dụng chuẩn phù hợp dựa trên loại chéo trội
+            diff_norm = np.linalg.norm(x_k - x_prev, norm)
+            
+            # Sai số hậu nghiệm theo công thức (1.50) 
+            estimated_error = stopping_factor * diff_norm
+            final_error = estimated_error
+            
             table_rows.append({
                 "k": i + 1,
                 "x_k": x_k.tolist(),
-                "error": error
+                "error": estimated_error,
+                "error_norm": diff_norm  # Thêm dòng này
             })
 
-            if error < eps:
+            # Kiểm tra điều kiện dừng
+            if estimated_error < eps:
                 break
         
-        steps = [{
-            "message": "Bảng quá trình lặp của ma trận nghiệm X",
-            "table": table_rows
-        }]
-
-        if i == max_iter - 1 and error >= eps:
-            return {"success": False, "error": f"Phương pháp không hội tụ sau {max_iter} lần lặp."}
+        if i == max_iter - 1 and final_error >= eps:
+            return {
+                "success": False, 
+                "error": f"Phương pháp không hội tụ sau {max_iter} lần lặp.",
+                "steps": [{"table": table_rows}]
+            }
 
         return {
             "success": True,
             "message": f"Hội tụ sau {i + 1} lần lặp.",
-            "warning": warning_message,
             "solution": x_k.tolist(),
             "iterations": i + 1,
-            "steps": steps
+            "steps": [{"message": "Bảng quá trình lặp", "table": table_rows}],
+            "contraction_coefficient_q": q,
+            "contraction_coefficient_s": s,
+            "norm_used": "vô cùng" if norm == np.inf else "1",
+            "dominance_type": dominance_type
         }
-
     except Exception as e:
-        import traceback
         return {"success": False, "error": f"Lỗi không xác định: {traceback.format_exc()}"}

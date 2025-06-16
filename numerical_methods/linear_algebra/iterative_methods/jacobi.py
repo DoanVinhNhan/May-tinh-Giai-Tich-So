@@ -69,7 +69,8 @@ def solve_jacobi(matrix_a, matrix_b, x0, eps=1e-5, max_iter=100):
             table_rows.append({
                 "k": i + 1,
                 "x_k": x_k_plus_1.tolist(),
-                "error": estimated_error
+                "error": estimated_error,
+                "error_norm": diff_norm
             })
             
             final_error = estimated_error

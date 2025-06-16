@@ -95,7 +95,7 @@ sidebarToggle.addEventListener('click', () => {
             <textarea id="matrix-a-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
         </div>
         <div>
-            <label for="matrix-b-input-hpt" class="block text-sm font-medium text-gray-700">Ma trận / Vector B</label>
+            <label for="matrix-b-input-hpt" class="block text-sm font-medium text-gray-700">Vector b</label>
             <textarea id="matrix-b-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7 1&#10;8 9&#10;3 -4"></textarea>
         </div>
     </div>
@@ -141,9 +141,8 @@ sidebarToggle.addEventListener('click', () => {
             <input id="inv-iter-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
         </div>
         <div id="inv-iter-x0-group">
-            <label for="inv-iter-x0-select" class="block text-sm font-medium text-gray-700">Chọn X₀ (cho Newton)</label>
+            <label for="inv-iter-x0-select" class="block text-sm font-medium text-gray-700">Chọn X₀</label>
              <select id="inv-iter-x0-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
-                <option value="auto" selected>Tự động</option>
                 <option value="method1">X₀ = Aᵀ / ||A||₂²</option>
                 <option value="method2">X₀ = Aᵀ / (||A||₁·||A||∞)</option>
             </select>
@@ -151,7 +150,7 @@ sidebarToggle.addEventListener('click', () => {
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <button id="calculate-inv-jacobi-btn" class="action-btn bg-teal-600 hover:bg-teal-700">Lặp Jacobi</button>
-        <button id="calculate-inv-newton-btn" class="action-btn bg-sky-600 hover:bg-sky-700">Lặp Newton</button>
+        <button id="calculate-inv-newton-btn" class="action-btn bg-sky-600 hover:bg-sky-700">Lặp tựa Newton</button>
     </div>
     <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
     <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
@@ -429,7 +428,7 @@ sidebarToggle.addEventListener('click', () => {
                 <textarea id="matrix-a-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="10 -1 2 0&#10;-1 11 -1 3&#10;2 -1 10 -1&#10;0 3 -1 8"></textarea>
             </div>
             <div>
-                <label for="matrix-b-input-iter" class="block text-sm font-medium text-gray-700">Vector B</label>
+                <label for="matrix-b-input-iter" class="block text-sm font-medium text-gray-700">Vector b</label>
                 <textarea id="matrix-b-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="6 1&#10;25 2&#10;-11 3&#10;15 4"></textarea>
             </div>
         </div>
@@ -459,12 +458,12 @@ sidebarToggle.addEventListener('click', () => {
                 <textarea id="matrix-b-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 font-mono" placeholder="0 0.1 -0.2 0&#10;0.0909 0 0.0909 -0.2727&#10;-0.2 0.1 0 0.1&#10;0 -0.375 0.125 0"></textarea>
             </div>
             <div>
-                <label for="matrix-d-input-simple-iter" class="block text-sm font-medium text-gray-700">Ma trận / Vector d</label>
+                <label for="matrix-d-input-simple-iter" class="block text-sm font-medium text-gray-700">Vector d</label>
                 <textarea id="matrix-d-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 font-mono" placeholder="0.6&#10;2.2727&#10;-1.1&#10;1.875"></textarea>
             </div>
         </div>
         <div class="mb-6">
-            <label for="x0-input-simple-iter" class="block text-sm font-medium text-gray-700">Ma trận / Vector lặp ban đầu X₀</label>
+            <label for="x0-input-simple-iter" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀</label>
             <textarea id="x0-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0&#10;0&#10;0&#10;0"></textarea>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

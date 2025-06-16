@@ -55,19 +55,16 @@ def solve_inverse_newton(A, eps=1e-5, max_iter=100, x0_method='auto', **kwargs):
         
         for i in range(max_iter):
             X_k_plus_1 = X_k @ (2 * E - A @ X_k)
-            
-            error = np.linalg.norm(X_k_plus_1 - X_k, 'fro')
-            
-            # Ghi lại ma trận X và sai số của bước lặp này
+            error = np.linalg.norm(X_k_plus_1 - X_k, 2)
+            estimated_error = q / (1 - q) * error if q < 1 else error
             iteration_details.append({
                 "iteration_number": i + 1,
                 "matrix_Xk": X_k_plus_1.tolist(),
-                "error_fro": error
+                "error_2": error,
+                "estimated_error": estimated_error
             })
-
-            if error < eps:
+            if estimated_error < eps:
                 break
-                
             X_k = X_k_plus_1
         
         # Đưa các bước lặp chi tiết vào kết quả trả về
