@@ -9,6 +9,13 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
     """
     Tính SVD của ma trận A bằng phương pháp power method + deflation.
     Trả về step-by-step cho từng giá trị kỳ dị, ghi rõ ma trận deflation và vector riêng tại mỗi bước.
+    
+    THUẬT TOÁN ĐÚNG:
+    1. Tính B₀ = A^T * A
+    2. Dùng power method để tìm λ₁ và v₁ từ B₀
+    3. Deflation: B₁ = B₀ - λ₁ * v₁ * v₁^T
+    4. Lặp lại trên B₁ để tìm λ₂, v₂, ...
+    
     Args:
         A: np.ndarray, ma trận đầu vào (m, n)
         num_singular: số giá trị kỳ dị cần tìm (mặc định: min(m, n))
@@ -18,94 +25,161 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
     Returns:
         dict: chứa U, Sigma, V_transpose, và step-by-step
     """
+    A = np.array(A, dtype=float)
     m, n = A.shape
-    ATA = A.T @ A
-    ATA_work = ATA.copy()
+    
+    # Chia trường hợp để tối ưu hiệu quả
+    if m < n:
+        # Trường hợp m > n: Dùng A^T * A để tìm right singular vectors
+        Matrix_work = A.T @ A  # Kích thước (n, n)
+        vector_size = n  # Vector có kích thước n
+        use_ATA = True
+    else:
+        # Trường hợp m <= n: Dùng A * A^T để tìm left singular vectors
+        Matrix_work = A @ A.T  # Kích thước (m, m)
+        vector_size = m  # Vector có kích thước m
+        use_ATA = False
+    
+    Matrix_work_original = Matrix_work.copy()
     singular_values = []
-    right_vecs = []
+    vectors = []  # Sẽ chứa right vectors (nếu m>n) hoặc left vectors (nếu m<=n)
     steps = []
-    k = num_singular if num_singular is not None else min(m, n)
+    
+    # Số giá trị kỳ dị tối đa có thể tìm
+    max_singular = min(m, n)
+    k = num_singular if num_singular is not None else max_singular
+    k = min(k, max_singular)  # Đảm bảo không vượt quá giới hạn
+    
     for s in range(k):
-        # Khởi tạo véctơ khởi đầu
+        # Khởi tạo véctơ khởi đầu với kích thước phù hợp
         if s == 0 and y_init is not None:
             y = np.array(y_init).reshape(-1, 1)
-            if y.shape[0] != n:
-                raise ValueError("Vector khởi đầu phải có kích thước (n, 1) hoặc (n,)")
+            if y.shape[0] != vector_size:
+                raise ValueError(f"Vector khởi đầu phải có kích thước ({vector_size}, 1) hoặc ({vector_size},)")
             y = y / np.linalg.norm(y)
         else:
-            y = np.random.rand(n, 1)
+            y = np.random.rand(vector_size, 1)
             y = y / np.linalg.norm(y)
+        
         y_steps = [y.copy()]
         lambda_steps = []
-        matrix_steps = [ATA_work.copy()]
+        matrix_before_deflation = Matrix_work.copy()
+        
+        # Power method trên Matrix_work
         for i in range(num_iter):
-            y_new = ATA_work @ y
-            y_new = y_new / np.linalg.norm(y_new)
-            lambda_new = float(y_new.T @ ATA_work @ y_new)
+            y_new = Matrix_work @ y
+            norm_y_new = np.linalg.norm(y_new)
+            
+            if norm_y_new < tol:
+                # Ma trận đã cạn kiệt, không còn giá trị kỳ dị có ý nghĩa
+                break
+                
+            y_new = y_new / norm_y_new
+            lambda_new = float(y_new.T @ Matrix_work @ y_new)
+            
             y = y_new
             y_steps.append(y.copy())
             lambda_steps.append(lambda_new)
+            
+            # Kiểm tra hội tụ
             if i > 0 and abs(lambda_steps[-1] - lambda_steps[-2]) < tol:
                 break
+        
+        # Nếu không tìm được giá trị riêng có ý nghĩa, dừng lại
+        if not lambda_steps or lambda_steps[-1] < tol:
+            break
+            
+        # Tính singular value từ eigenvalue
         singular = np.sqrt(abs(lambda_steps[-1]))
         singular_values.append(singular)
-        right_vecs.append(y)
-        # Deflation: loại bỏ thành phần vừa tìm được
-        ATA_work = ATA_work - lambda_steps[-1] * (y @ y.T)
-        matrix_steps.append(ATA_work.copy())
-        # Lưu step-by-step, ghi rõ ma trận deflation và vector riêng tại mỗi bước
+        
+        # Normalize vector
+        y = y / np.linalg.norm(y)
+        vectors.append(y.copy())
+        
+        # DEFLATION ĐÚNG: Thực hiện trên chính ma trận Matrix_work
+        # B_{k+1} = B_k - λ_k * v_k * v_k^T
+        Matrix_work = Matrix_work - lambda_steps[-1] * (y @ y.T)
+        
+        # Lưu step-by-step
         steps.append({
             'singular_index': s+1,
-            'deflation_matrix_before': zero_small(matrix_steps[0]).tolist(),
-            'deflation_matrix_after': zero_small(matrix_steps[1]).tolist(),
+            'deflation_matrix_before': zero_small(matrix_before_deflation).tolist(),
+            'deflation_matrix_after': zero_small(Matrix_work.copy()).tolist(),
             'lambda_steps': [float(l) for l in lambda_steps],
             'y_steps': [v.flatten().tolist() for v in y_steps],
             'singular_value': float(singular),
-            'right_vec': (y / np.linalg.norm(y)).flatten().tolist(),  # Đưa về chuẩn 2 bằng 1
+            'vector': y.flatten().tolist(),
         })
-    # Tạo ma trận V từ các vector riêng tìm được
-    V = np.hstack(right_vecs)
-    # Tính U = AV/σ
-    U = []
-    for i in range(len(singular_values)):
-        sigma = singular_values[i]
-        if sigma > tol:
-            u = A @ right_vecs[i] / sigma
-        else:
-            u = np.zeros((m, 1))
-        U.append(u)
-    U = np.hstack(U)
-    # Chuẩn hóa U
-    for i in range(U.shape[1]):
-        norm = np.linalg.norm(U[:, i])
-        if norm > 0:
-            U[:, i] /= norm
-    # Tạo Sigma
+    
+    # Nếu không tìm được giá trị kỳ dị nào
+    if not singular_values:
+        return {
+            'success': False,
+            'error': 'Không thể tìm được giá trị kỳ dị nào với tolerance đã cho'
+        }
+    
+    # Tạo ma trận U và V tùy theo trường hợp
+    if use_ATA:
+        # Trường hợp m > n: vectors chứa right singular vectors
+        V = np.hstack(vectors) if vectors else np.zeros((n, 1))
+        # Tính U = A * V * Σ^(-1)
+        U_list = []
+        for i in range(len(singular_values)):
+            sigma = singular_values[i]
+            if sigma > tol:
+                u = A @ vectors[i] / sigma
+                # Normalize u
+                u_norm = np.linalg.norm(u)
+                if u_norm > tol:
+                    u = u / u_norm
+                U_list.append(u)
+        U = np.hstack(U_list) if U_list else np.zeros((m, 1))
+    else:
+        # Trường hợp m <= n: vectors chứa left singular vectors
+        U = np.hstack(vectors) if vectors else np.zeros((m, 1))
+        # Tính V = A^T * U * Σ^(-1)
+        V_list = []
+        for i in range(len(singular_values)):
+            sigma = singular_values[i]
+            if sigma > tol:
+                v = A.T @ vectors[i] / sigma
+                # Normalize v
+                v_norm = np.linalg.norm(v)
+                if v_norm > tol:
+                    v = v / v_norm
+                V_list.append(v)
+        V = np.hstack(V_list) if V_list else np.zeros((n, 1))
+    
+    # Tạo Sigma matrix (full size)
     Sigma = np.zeros((m, n))
-    for i in range(len(singular_values)):
+    num_values = min(len(singular_values), min(m, n))
+    for i in range(num_values):
         Sigma[i, i] = singular_values[i]
+    
     # Tính rank thực sự (số giá trị kỳ dị > ngưỡng)
     effective_singular_values = [s for s in singular_values if s > tol]
-    r = len(effective_singular_values)  # Rank thực sự
+    r = len(effective_singular_values)
     
     # Tạo dạng rút gọn dựa trên rank thực sự
-    diag_len = r if r > 0 else 1  # Tránh trường hợp r = 0
-    U_reduced = U[:, :diag_len]
-    Sigma_reduced = Sigma[:diag_len, :diag_len]
-    Vt_reduced = V.T[:diag_len, :]
+    diag_len = r if r > 0 else 1
+    U_reduced = U[:, :diag_len] if U.shape[1] >= diag_len else U
+    Sigma_reduced = np.diag(effective_singular_values) if r > 0 else np.zeros((1, 1))
+    Vt_reduced = V.T[:diag_len, :] if V.shape[1] >= diag_len else V.T
     # Tổng thành phần
-    svd_sum_components = [
-        {
-            "sigma": float(singular_values[i]),
-            "u": U[:, i].tolist(),
-            "v": V[:, i].tolist()
-        }
-        for i in range(diag_len)
-    ]
+    svd_sum_components = []
+    for i in range(len(effective_singular_values)):
+        if i < U.shape[1] and i < V.shape[1]:
+            svd_sum_components.append({
+                "sigma": float(effective_singular_values[i]),
+                "u": U[:, i].tolist(),
+                "v": V[:, i].tolist()
+            })
+    
     # Tính ma trận xấp xỉ từ SVD
     def compute_approximations():
         # Xấp xỉ đầy đủ
-        A_full_approx = U @ Sigma @ V.T
+        A_full_approx = U_reduced @ Sigma_reduced @ Vt_reduced
         
         # Xấp xỉ rút gọn (chỉ dùng rank thực sự)  
         A_reduced_approx = U_reduced @ Sigma_reduced @ Vt_reduced
@@ -115,17 +189,18 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
         A_cumulative = np.zeros_like(A)
         
         for i in range(r):
-            # Xấp xỉ rank-1: σᵢ * uᵢ * vᵢ^T
-            rank_1_approx = singular_values[i] * np.outer(U[:, i], V[:, i])
-            A_cumulative += rank_1_approx
-            
-            rank_approximations.append({
-                "rank": i + 1,
-                "singular_value": float(singular_values[i]),
-                "rank_1_component": zero_small(rank_1_approx).tolist(),
-                "cumulative_approximation": zero_small(A_cumulative.copy()).tolist(),
-                "frobenius_error": float(np.linalg.norm(A - A_cumulative, 'fro'))
-            })
+            if i < len(effective_singular_values) and i < U.shape[1] and i < V.shape[1]:
+                # Xấp xỉ rank-1: σᵢ * uᵢ * vᵢ^T
+                rank_1_approx = effective_singular_values[i] * np.outer(U[:, i], V[:, i])
+                A_cumulative += rank_1_approx
+                
+                rank_approximations.append({
+                    "rank": i + 1,
+                    "singular_value": float(effective_singular_values[i]),
+                    "rank_1_component": zero_small(rank_1_approx).tolist(),
+                    "cumulative_approximation": zero_small(A_cumulative.copy()).tolist(),
+                    "frobenius_error": float(np.linalg.norm(A - A_cumulative, 'fro'))
+                })
         
         return {
             "full_approximation": zero_small(A_full_approx).tolist(),
@@ -140,7 +215,7 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
     # Trả về kết quả
     return {
         'success': True,
-        'rank': r,  # Thêm thông tin rank
+        'rank': r,
         'U': zero_small(U).tolist(),
         'Sigma': zero_small(Sigma).tolist(),
         'V_transpose': zero_small(V.T).tolist(),
@@ -149,12 +224,13 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
         'Vt_reduced': zero_small(Vt_reduced).tolist(),
         'svd_sum_components': svd_sum_components,
         'intermediate_steps': {
-            'A_transpose_A': zero_small(ATA).tolist(),
+            'matrix_used': f"{'A^T*A' if use_ATA else 'A*A^T'} (kích thước {Matrix_work_original.shape})",
+            'original_matrix': zero_small(Matrix_work_original).tolist(),
             'singular_values': [float(s) for s in singular_values],
-            'effective_rank': r,  # Thông tin rank trong steps
+            'effective_rank': r,
             'steps': steps
         },
-        "approximations": approximations  # Thêm thông tin về các ma trận xấp xỉ
+        "approximations": approximations
     }
 
 def svd_numpy(A):

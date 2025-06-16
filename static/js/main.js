@@ -1507,10 +1507,6 @@ function displayInverseResults(result, method) {
 
 
 // === CÁC HÀM HIỂN THỊ CŨ (GIỮ NGUYÊN) ===
-function showSvdTab(tab) {
-    document.querySelectorAll('.svd-tab').forEach(div => div.classList.add('hidden'));
-    document.getElementById('svd-tab-' + tab).classList.remove('hidden');
-}
 function displaySvdResults(result) {
     const resultsArea = document.getElementById('results-area');
     let html = `
@@ -1557,43 +1553,63 @@ function displaySvdResults(result) {
             `).join('')}
         </div>
         `;
-    if (result.intermediate_steps) {
-        if (result.intermediate_steps.A_transpose_A){
-            html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian</h3><div class="space-y-6">`;
-        }
-        if (result.intermediate_steps.A_transpose_A) {
-            html += `<div><h4 class="font-medium text-gray-700">Ma trận AᵀA</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.A_transpose_A)}</div></div>`;
-        }
-        if (result.intermediate_steps.eigenvalues_of_ATA) {
-            html += `<div><h4 class="font-medium text-gray-700">Giá trị riêng của AᵀA (λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.eigenvalues_of_ATA.map(v => formatNumber(v)).join(', ')} ]</div></div>`;
-        }
-        if (result.intermediate_steps.singular_values) {
-            html += `<div><h4 class="font-medium text-gray-700">Giá trị kỳ dị (σ = √λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.singular_values.map(v => formatNumber(v)).join(', ')} ]</div></div>`;
-        }
-        if (result.intermediate_steps.V_matrix) {
-            html += `<div><h4 class="font-medium text-gray-700">Ma trận V</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.V_matrix)}</div></div>`;
-        }
-        if (result.intermediate_steps.steps) {
-            html += `<div class="mt-8"><h4 class="font-medium text-gray-700">Các bước lặp Power Method + Xuống thang</h4>`;
-            result.intermediate_steps.steps.forEach((step, idx) => {
-                html += `<div class="mb-6 p-4 bg-gray-50 rounded-lg border">
-                    <h5 class="font-medium text-gray-700 mb-2">Giá trị kỳ dị thứ ${step.singular_index} (σ ≈ ${formatNumber(step.singular_value)})</h5>
-                    <div class="mb-2 text-sm text-gray-600">Các bước lặp:</div>
-                    <ol class="list-decimal ml-6 mb-2 text-sm">`;
-                step.lambda_steps.forEach((lam, i) => {
-                     html += `<li>λ<sub>${i+1}</sub> = ${formatNumber(lam)}, vector y: [${step.y_steps[i+1].map(v => formatNumber(v,3)).join(', ')}]</li>`;
-                });
-                html += `</ol>
-                    <div class="mb-2 text-sm text-gray-600">Véctơ riêng cuối cùng (chuẩn hóa): [${step.right_vec.map(v => formatNumber(v,4)).join(', ')}]</div>
-                </div>`;
-            });
-            html += `</div>`;
-        }
-        html += `</div>`;
-    }
-    resultsArea.innerHTML = html;
 
+    if (result.intermediate_steps && result.intermediate_steps.steps) {
+        html += `<div class="mt-10"><h3 class="result-heading">Các Bước Tính Toán Trung Gian (Power Method)</h3><div class="space-y-6">`;
+
+        if (result.intermediate_steps.original_matrix) {
+            html += `<div><h4 class="font-medium text-gray-700">Ma trận được sử dụng: ${result.intermediate_steps.matrix_used}</h4><div class="matrix-display">${formatMatrix(result.intermediate_steps.original_matrix)}</div></div>`;
+        }
+
+        if (result.intermediate_steps.singular_values) {
+            html += `<div><h4 class="font-medium text-gray-700">Giá trị kỳ dị tìm được (σ = √λ)</h4><div class="p-3 bg-gray-50 rounded-md text-sm font-mono">[ ${result.intermediate_steps.singular_values.map(v => formatNumber(v)).join(', ')} ]</div></div>`;
+        }
+
+        html += `<div class="mt-8"><h4 class="font-medium text-gray-700">Các bước lặp Power Method + Xuống thang</h4>`;
+        result.intermediate_steps.steps.forEach((step, idx) => {
+            html += `<div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <h5 class="font-medium text-gray-700 mb-2">Giá trị kỳ dị thứ ${step.singular_index} (σ ≈ ${formatNumber(step.singular_value)})</h5>
+                <div class="mb-2 text-sm text-gray-600">Các bước lặp:</div>
+                <ol class="list-decimal ml-6 mb-2 text-sm">`;
+            step.lambda_steps.forEach((lam, i) => {
+                 html += `<li>λ<sub>${i+1}</sub> = ${formatNumber(lam)}, vector y: [${step.y_steps[i+1].map(v => formatNumber(v,3)).join(', ')}]</li>`;
+            });
+            html += `</ol>
+                <div class="mb-2 text-sm text-gray-600">Véctơ riêng cuối cùng (chuẩn hóa): [${step.vector.map(v => formatNumber(v,4)).join(', ')}]</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+    } else if (result.intermediate_steps) {
+        html += `<div class="mt-10"><h3 class="result-heading">Ghi Chú</h3><p>${result.intermediate_steps.note}</p></div>`;
+    }
+    
+    resultsArea.innerHTML = html;
     attachCopyMatrixEvents();
+
+    // SỬA LỖI: Thêm dòng này để khởi tạo trạng thái cho các tab
+    showSvdTab('full');
+}
+function showSvdTab(tabName) {
+    // Tắt tất cả các tab và nút bấm
+    document.querySelectorAll('.svd-tab').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    document.querySelectorAll('.svd-tab-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white');
+        btn.classList.add('bg-white', 'text-gray-600');
+    });
+
+    // Bật tab và nút bấm được chọn
+    const tabToShow = document.getElementById(`svd-tab-${tabName}`);
+    const btnToActivate = document.getElementById(`svd-btn-${tabName}`);
+
+    if (tabToShow) {
+        tabToShow.classList.remove('hidden');
+    }
+    if (btnToActivate) {
+        btnToActivate.classList.add('bg-indigo-600', 'text-white');
+        btnToActivate.classList.remove('bg-white', 'text-gray-600');
+    }
 }
 
 function displayGaussJordanResults(result) {
