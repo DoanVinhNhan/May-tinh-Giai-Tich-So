@@ -6,7 +6,7 @@ def solve_simple_iteration(B, d, x0, eps=1e-5, max_iter=100, norm_choice='inf'):
     Hàm này hỗ trợ:
     - Giải đồng thời nhiều hệ phương trình (khi d và x0 có nhiều cột).
     - Lựa chọn chuẩn tính toán (1 hoặc vô cùng) cho tất cả các bước.
-    - Sử dụng điều kiện dừng nâng cao: error < (||I - B|| / ||B||) * tol.
+    - Sử dụng điều kiện dừng nâng cao: error < abs((1-q) / q) * tol.
 
     Args:
         B (np.ndarray): Ma trận lặp B, kích thước (n, n).
@@ -53,7 +53,7 @@ def solve_simple_iteration(B, d, x0, eps=1e-5, max_iter=100, norm_choice='inf'):
         else:
             I = np.identity(n)
             norm_I_minus_B = np.linalg.norm(I - B, norm)
-            stopping_threshold = (norm_I_minus_B / norm_B) * eps
+            stopping_threshold = np.abs((1-norm_B) / norm_B) * eps
         
         warning_message = None
         if norm_B >= 1:
