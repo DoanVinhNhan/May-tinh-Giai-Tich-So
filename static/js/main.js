@@ -439,6 +439,7 @@ async function handleCalculation(endpoint, body) {
             'bordering': wrapDisplay(displayInverseResults),
             'jacobi': wrapDisplay(displayInverseResults),
             'newton': wrapDisplay(displayInverseResults),
+            'gauss-seidel': wrapDisplay(displayInverseResults),
             'nonlinear-system/solve': wrapDisplay(displayNonlinearSystemResults),
             'polynomial/solve': wrapDisplay(displayPolynomialResults)
         };
@@ -657,6 +658,7 @@ function setupMatrixInverseIterativeEvents() {
     const inputId = 'matrix-a-input-inv-iter';
     document.getElementById('calculate-inv-jacobi-btn').onclick = () => setupInverseCalculation('/matrix/inverse/jacobi', inputId);
     document.getElementById('calculate-inv-newton-btn').onclick = () => setupInverseCalculation('/matrix/inverse/newton', inputId);
+    document.getElementById('calculate-inv-gauss-seidel-btn').onclick = () => setupInverseCalculation('/matrix/inverse/gauss-seidel', inputId);
 }
 
 // --- END: CÁC HÀM SETUP EVENT MỚI ---
@@ -1266,6 +1268,23 @@ function displayInverseResults(result, method) {
             </div>
         </div>`;
     }
+    if (method === 'gauss-seidel' && result.contraction_coefficient_q !== undefined) {
+        html += `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 shadow-sm">
+                <div class="font-semibold text-blue-700 mb-2 flex items-center">
+                    <span class="material-icons mr-2">info</span> Thông tin hội tụ & lặp
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
+                    <div><b>Hệ số co q:</b> ${formatNumber(result.contraction_coefficient_q, 6)}</div>
+                    <div><b>Hệ số s:</b> ${formatNumber(result.contraction_coefficient_s, 6)}</div>
+                    <div><b>Chuẩn sử dụng:</b> ${result.norm_used}</div>
+                    <div><b>Kiểu chéo trội:</b> ${result.dominance_type}</div>
+                    <div class="md:col-span-2"><b>Công thức dừng:</b> <span class="font-mono">${result.stop_formula}</span></div>
+                    <div class="md:col-span-2"><b>X₀:</b> <span class="font-mono">${result.x0_label}</span></div>
+                </div>
+                </div>
+        `;
+    }
     // --- END BỔ SUNG ---
 
     if (result.inverse) {
@@ -1357,13 +1376,13 @@ function displayInverseResults(result, method) {
                     html += `<tr>
                             <td class="px-4 py-2 text-center">${row.k}</td>
                             <td class="px-4 py-2 font-mono">${formatMatrix(row.x_k)}</td>`;
-                    if (aposterioriHeader) {
-                        html += `<td class="px-4 py-2 text-center">${row.error_norm !== undefined ? formatNumber(row.error_norm, 8) : ''}</td>`;
-                    }
-                    html += `<td class="px-4 py-2 text-center">${row.error_aposteriori !== undefined && row.error_aposteriori !== null ? formatNumber(row.error_aposteriori, 8) : formatNumber(row.error, 8)}</td>`;
-                    html += `</tr>`;
-                });
-                html += `</tbody></table></div>`;
+                if (aposterioriHeader) {
+                    html += `<td class="px-4 py-2 text-center">${row.error_norm !== undefined ? formatNumber(row.error_norm, 8) : ''}</td>`;
+                }
+                html += `<td class="px-4 py-2 text-center">${row.error_aposteriori !== undefined && row.error_aposteriori !== null ? formatNumber(row.error_aposteriori, 8) : formatNumber(row.error, 8)}</td>`;
+                html += `</tr>`;
+            });
+            html += `</tbody></table></div>`;
             }
 
             html += `</div>`;
