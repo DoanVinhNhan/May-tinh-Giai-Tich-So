@@ -138,7 +138,7 @@ def power_method_single(A, tol=1e-9, max_iter=250, x0=None):
             x = np.ones((n, 1), dtype=complex)
         x = x / np.linalg.norm(x)
     else:
-        x = np.random.rand(n, 1).astype(complex)
+        x = np.ones((n, 1), dtype=complex)
         x = x / np.linalg.norm(x)
     lambda_old = 0.0
     for i in range(max_iter):
