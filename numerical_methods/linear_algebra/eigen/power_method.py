@@ -240,13 +240,13 @@ def power_iteration_deflation(A, num_values=1, tol=1e-6, max_iter=100, x0=None):
         warnings = []
         for s in range(num_values):
             # --- SỬ DỤNG x0 NẾU ĐƯỢC TRUYỀN VÀO (chỉ cho lần đầu) ---
-            if s == 0 and x0 is not None:
+            if x0 is not None:
                 x = np.array(x0, dtype=float).reshape((n, 1))
                 if np.linalg.norm(x) == 0:
                     x = np.ones((n, 1))
                 x = x / np.linalg.norm(x)
             else:
-                x = np.random.rand(n, 1)
+                x = np.ones((n, 1))
                 x = x / np.linalg.norm(x)
             lambda_prev = 0
             iteration_steps = []

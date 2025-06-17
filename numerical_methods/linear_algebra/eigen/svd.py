@@ -52,13 +52,13 @@ def svd_power_deflation(A, num_singular=None, num_iter=20, tol=1e-15, y_init=Non
     
     for s in range(k):
         # Khởi tạo véctơ khởi đầu với kích thước phù hợp
-        if s == 0 and y_init is not None:
+        if y_init is not None:
             y = np.array(y_init).reshape(-1, 1)
             if y.shape[0] != vector_size:
                 raise ValueError(f"Vector khởi đầu phải có kích thước ({vector_size}, 1) hoặc ({vector_size},)")
             y = y / np.linalg.norm(y)
         else:
-            y = np.random.rand(vector_size, 1)
+            y = np.ones((vector_size, 1))
             y = y / np.linalg.norm(y)
         
         y_steps = [y.copy()]
