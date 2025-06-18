@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Máy Tính Giải Tích Số</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
+</head>
+<body class="bg-gray-100 font-['Be_Vietnam_Pro']">
+<div class="flex min-h-screen">
+    <aside id="sidebar-menu" class="bg-white shadow-lg w-64 min-w-[180px] max-w-xs transition-all duration-300 ease-in-out h-screen sticky top-0 z-20 flex flex-col" style="left:0;">
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+            <span class="font-bold text-lg text-blue-700">Menu</span>
+            <button id="sidebar-toggle" class="text-gray-500 hover:text-blue-600 focus:outline-none">
+                <svg id="sidebar-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+        </div>
+        <nav class="flex-1 px-2 py-4">
+            <ul class="space-y-2">
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-blue-50 font-medium text-gray-800" data-page="matrix">Máy tính ma trận</button>
+                    <ul class="ml-4 mt-1 space-y-1">
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve-direct">Giải hệ phương trình</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-solve-iterative">PP Lặp - Giải hệ phương trình</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-direct">Tính ma trận nghịch đảo</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-inverse-iterative">PP Lặp - Tính ma trận nghịch đảo</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-svd">Phân tích SVD</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-approximation">Ma trận xấp xỉ SVD</button></li>
+                        <li><button class="w-full text-left px-3 py-1 rounded hover:bg-blue-100 text-gray-700" data-page="matrix-eigen-methods">Tìm giá trị riêng</button></li>
+                    </ul>
+                </li>
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-green-50 font-medium text-gray-800" data-page="nonlinear-solve">Giải phương trình f(x)=0</button>
+                </li>
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-purple-50 font-medium text-gray-800" data-page="polynomial-solve">Giải phương trình đa thức</button>
+                </li>
+                <li>
+                    <button class="w-full text-left px-3 py-2 rounded hover:bg-yellow-50 font-medium text-gray-800" data-page="nonlinear-system-solve">Giải hệ phương trình phi tuyến</button>
+                </li>
+
+            </ul>
+        </nav>
+    </aside>
+    <div class="flex-1">
+        <div class="container mx-auto p-4 md:p-8">
+            <header class="flex justify-between items-center mb-8">
+                <h1 id="page-title" class="text-4xl font-bold text-gray-800">Máy tính Ma trận</h1>
+
+                <div class="text-right">
+                    <h4 class="text-sm font-medium text-gray-600 mb-2">Cài đặt hiển thị</h4>
+                    <div class="flex items-center space-x-4">
+                        <div>
+                            <label for="setting-precision" class="block text-xs font-medium text-gray-500">Số chữ số sau dấu phẩy</label>
+                            <input type="number" id="setting-precision" value="4" min="0" max="15" class="mt-1 block w-24 rounded-md border-gray-300 shadow-sm sm:text-sm p-1 text-xs font-mono">
+                        </div>
+                        <div>
+                            <label for="setting-zero-tolerance" class="block text-xs font-medium text-gray-500">Ngưỡng làm tròn về 0</label>
+                            <input type="text" id="setting-zero-tolerance" value="1e-15" class="mt-1 block w-24 rounded-md border-gray-300 shadow-sm sm:text-sm p-1 text-xs font-mono">
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <main id="main-content" class="bg-white p-6 rounded-2xl shadow-lg">
+                </main>
+            <footer class="text-center mt-8 text-gray-500 text-sm"><p>&copy; 2025 - Xây dựng bởi ĐVN</p></footer>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+// Sidebar toggle logic
+const sidebar = document.getElementById('sidebar-menu');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+let sidebarOpen = true;
+sidebarToggle.addEventListener('click', () => {
+    sidebarOpen = !sidebarOpen;
+    if (sidebarOpen) {
+        sidebar.style.left = '0';
+        sidebar.style.width = '16rem';
+    } else {
+        sidebar.style.left = '-13rem';
+        sidebar.style.width = '0';
+    }
+});
+</script>
+
+<div id="matrix-solve-direct-page" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+            <label for="matrix-a-input-hpt" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+            <textarea id="matrix-a-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+        </div>
+        <div>
+            <label for="matrix-b-input-hpt" class="block text-sm font-medium text-gray-700">Vector b</label>
+            <textarea id="matrix-b-input-hpt" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="7 1&#10;8 9&#10;3 -4"></textarea>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button id="calculate-gauss-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Gauss</button>
+        <button id="calculate-gj-btn" class="action-btn bg-green-600 hover:bg-green-700">Gauss-Jordan</button>
+        <button id="calculate-lu-btn" class="action-btn bg-orange-500 hover:bg-orange-600">LU</button>
+        <button id="calculate-cholesky-btn" class="action-btn bg-red-500 hover:bg-red-600">Cholesky</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="matrix-inverse-direct-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-inv-direct" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-inv-direct" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 3 -2&#10;3 4 -5&#10;-2 -5 3"></textarea>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button id="calculate-inv-gj-btn" class="action-btn bg-green-600 hover:bg-green-700">Gauss-Jordan</button>
+        <button id="calculate-inv-lu-btn" class="action-btn bg-orange-500 hover:bg-orange-600">LU</button>
+        <button id="calculate-inv-cholesky-btn" class="action-btn bg-red-500 hover:bg-red-600">Cholesky</button>
+        <button id="calculate-inv-bordering-btn" class="action-btn bg-cyan-600 hover:bg-cyan-700">Viền quanh</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="matrix-inverse-iterative-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-inv-iter" class="block text-sm font-medium text-gray-700">Ma trận A (yêu cầu chéo trội hoặc có thể biến đổi)</label>
+        <textarea id="matrix-a-input-inv-iter" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="15 -3 8 6&#10;2 25 4 -9&#10;3 7 -30 25&#10;-4 2 3 -60"></textarea>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+            <label for="inv-iter-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+            <input id="inv-iter-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.00001">
+        </div>
+        <div>
+            <label for="inv-iter-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+            <input id="inv-iter-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+        </div>
+        <div id="inv-iter-x0-group">
+            <label for="inv-iter-x0-select" class="block text-sm font-medium text-gray-700">Chọn X₀</label>
+             <select id="inv-iter-x0-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
+                <option value="method1">X₀ = Aᵀ / ||A||₂²</option>
+                <option value="method2">X₀ = Aᵀ / (||A||₁·||A||∞)</option>
+            </select>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button id="calculate-inv-jacobi-btn" class="action-btn bg-teal-600 hover:bg-teal-700">Lặp Jacobi</button>
+        <button id="calculate-inv-newton-btn" class="action-btn bg-sky-600 hover:bg-sky-700">Lặp tựa Newton</button>
+        <button id="calculate-inv-gauss-seidel-btn" class="action-btn bg-lime-600 hover:bg-lime-700">Lặp Gauss-Seidel</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="matrix-svd-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-svd" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-svd" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+    </div>
+    <div class="mb-6">
+        <label for="svd-method-select" class="block text-sm font-medium text-gray-700">Phương pháp SVD</label>
+        <select id="svd-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2">
+            <option value="default">SVD chuẩn (NumPy)</option>
+            <option value="power">SVD Power Method + Deflation</option>
+        </select>
+    </div>
+    <div id="svd-power-options" style="display:none;">
+        <div class="mb-6">
+            <label for="svd-num-singular" class="block text-sm font-medium text-gray-700">Số giá trị kỳ dị cần tìm (mặc định: nhỏ nhất giữa số hàng/cột)</label>
+            <input id="svd-num-singular" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="(Tùy chọn)">
+        </div>
+        <div class="mb-6">
+            <label for="svd-init-matrix-input" class="block text-sm font-medium text-gray-700">Vector khởi đầu SVD (tùy chọn, nhập dạng 1 1 1 hoặc mỗi dòng 1 số)</label>
+            <textarea id="svd-init-matrix-input" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-3 font-mono" placeholder="1 1 1 hoặc 1\n1\n1"></textarea>
+        </div>
+    </div>
+    <div class="mb-6">
+        <button id="calculate-svd-btn" class="action-btn bg-blue-600 hover:bg-blue-700">Tính SVD</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="matrix-eigen-methods-page" class="hidden">
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <button data-tab="danilevsky" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">
+                PP. Danilevsky
+            </button>
+            <button data-tab="power-single" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">
+                PP. Lũy thừa (GTR Trội)
+            </button>
+            <button data-tab="power-deflation" class="eigen-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">
+                PP. Lũy thừa & Xuống thang
+            </button>
+        </nav>
+    </div>
+
+    <div>
+        <div id="eigen-danilevsky-content" class="eigen-tab-content">
+            <div class="mb-6">
+                <label for="matrix-a-input-danilevsky" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-danilevsky" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-danilevsky-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Tính bằng Danilevsky</button>
+            </div>
+        </div>
+
+        <div id="eigen-power-single-content" class="eigen-tab-content hidden">
+             <div class="mb-6">
+                <label for="matrix-a-input-power-single" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-power-single" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="6 5 -5&#10;2 6 -2&#10;2 5 -1"></textarea>
+            </div>
+            <div class="mb-4">
+                <label for="power-x0-input" class="block text-sm font-medium text-gray-700">Vector khởi tạo X₀ (cách nhau bằng dấu cách hoặc xuống dòng)</label>
+                <textarea id="power-x0-input" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="1 1 1"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="power-single-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                    <input id="power-single-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.00001">
+                </div>
+                <div>
+                    <label for="power-single-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                    <input id="power-single-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+                </div>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-power-method-single-btn" class="action-btn bg-indigo-600 hover:bg-indigo-700">Tìm giá trị riêng trội</button>
+            </div>
+        </div>
+
+        <div id="eigen-power-deflation-content" class="eigen-tab-content hidden">
+             <div class="mb-6">
+                <label for="matrix-a-input-power-deflation" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+                <textarea id="matrix-a-input-power-deflation" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-3 font-mono" placeholder="4 1 -1&#10;2 5 -2&#10;1 1 2"></textarea>
+            </div>
+            <div class="mb-4">
+                <label for="power-x0-input-deflation" class="block text-sm font-medium text-gray-700">Vector khởi tạo X₀ (cách nhau bằng dấu cách hoặc xuống dòng)</label>
+                <textarea id="power-x0-input-deflation" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="1 1 1"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="power-deflation-num-eigen" class="block text-sm font-medium text-gray-700">Số GTR cần tìm</label>
+                    <input id="power-deflation-num-eigen" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="3" min="1">
+                </div>
+                <div>
+                    <label for="power-deflation-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                    <input id="power-deflation-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.00001">
+                </div>
+                <div>
+                    <label for="power-deflation-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                    <input id="power-deflation-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+                </div>
+            </div>
+            <div class="mb-6">
+                <button id="calculate-power-method-deflation-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tính các giá trị riêng</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="nonlinear-solve-page" class="hidden">
+    <div class="space-y-6">
+        <div>
+            <label for="nonlinear-method-select" class="block text-sm font-medium text-gray-700">Phương pháp</label>
+            <select id="nonlinear-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2">
+                <option value="bisection">Chia đôi (Bisection)</option>
+                <option value="newton">Newton (Tiếp tuyến)</option>
+                <option value="secant">Dây cung (Secant)</option>
+                <option value="simple_iteration">Lặp đơn</option>
+            </select>
+        </div>
+
+        <div id="f-expression-group">
+            <label for="f-expression-input" class="block text-sm font-medium text-gray-700">Biểu thức f(x) (dạng LaTeX)</label>
+            <input id="f-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="x^3 - x - 2">
+            <div id="f-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center text-lg"></div>
+        </div>
+        <div id="phi-expression-group" style="display:none;">
+            <label for="phi-expression-input" class="block text-sm font-medium text-gray-700">Hàm lặp φ(x) (dạng LaTeX)</label>
+            <input id="phi-expression-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2 font-mono" placeholder="\sqrt[3]{x+2}">
+            <div id="phi-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center text-lg"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="interval-a-input" class="block text-sm font-medium text-gray-700">Điểm đầu khoảng (a)</label>
+                <input id="interval-a-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="1">
+            </div>
+            <div>
+                <label for="interval-b-input" class="block text-sm font-medium text-gray-700">Điểm cuối khoảng (b)</label>
+                <input id="interval-b-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="2">
+            </div>
+            <div id="x0-group" style="display:none;">
+                <label for="x0-input" class="block text-sm font-medium text-gray-700">Điểm bắt đầu (x₀)</label>
+                <input id="x0-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="1.5">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label for="stop-mode-select" class="block text-sm font-medium text-gray-700">Điều kiện dừng</label>
+                <select id="stop-mode-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
+                    <option value="absolute_error">Sai số tuyệt đối</option>
+                    <option value="relative_error">Sai số tương đối</option>
+                    <option value="iterations">Số lần lặp</option>
+                </select>
+            </div>
+            <div>
+                <label for="stop-value-input" class="block text-sm font-medium text-gray-700">Giá trị (ε, δ, hoặc N)</label>
+                <input id="stop-value-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="0.0001">
+            </div>
+        </div>
+        
+        <div id="advanced-stop-condition-group" style="display:none;">
+            <label class="block text-sm font-medium text-gray-700">Công thức đánh giá sai số</label>
+            <div class="mt-2 space-y-3 p-3 bg-gray-50 rounded-md">
+                <div class="flex items-center">
+                    <input id="adv-stop-radio-1" name="advanced-stop-option" type="radio" value="f_xn" checked class="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500">
+                    <label for="adv-stop-radio-1" class="ml-3 block text-lg font-medium text-gray-800" id="adv-stop-label-1"></label>
+                </div>
+                <div class="flex items-center">
+                    <input id="adv-stop-radio-2" name="advanced-stop-option" type="radio" value="xn_x_prev" class="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500">
+                    <label for="adv-stop-radio-2" class="ml-3 block text-lg font-medium text-gray-800" id="adv-stop-label-2"></label>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-8 mb-8">
+        <button id="calculate-nonlinear-btn" class="action-btn bg-green-600 hover:bg-green-700">Giải</button>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<div id="nonlinear-system-solve-page" class="hidden">
+    <div class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-1">
+                <label for="ns-method-select" class="block text-sm font-medium text-gray-700">Phương pháp</label>
+                <select id="ns-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm p-2">
+                    <option value="newton">Newton</option>
+                    <option value="newton_modified">Newton Modified</option>
+                    <option value="simple_iteration">Lặp đơn</option>
+                </select>
+            </div>
+            <div>
+                <label for="ns-stop-option-select" class="block text-sm font-medium text-gray-700">Điều kiện dừng</label>
+                <select id="ns-stop-option-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
+                    <option value="absolute_error">Sai số tuyệt đối</option>
+                    <option value="relative_error">Sai số tương đối</option>
+                    <option value="iterations">Số lần lặp</option>
+                </select>
+            </div>
+            <div>
+                <label for="ns-stop-value-input" class="block text-sm font-medium text-gray-700">Giá trị (ε, δ, hoặc N)</label>
+                <input id="ns-stop-value-input" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" placeholder="0.0001">
+            </div>
+        </div>
+
+        <!-- Khối chọn chuẩn tính sai số cho PP Newton -->
+        <div id="ns-norm-selection-group" style="display:none;">
+            <label class="block text-sm font-medium text-gray-700">Chọn chuẩn</label>
+            <div class="mt-2 flex items-center space-x-6 p-3 bg-gray-50 rounded-md">
+                <div class="flex items-center">
+                    <input id="ns-norm-inf" name="ns-norm-option" type="radio" value="infinity" checked class="h-4 w-4 text-yellow-600 border-gray-300 focus:ring-yellow-500">
+                    <label for="ns-norm-inf" class="ml-2 flex items-center cursor-pointer">
+                        <span class="font-mono text-lg" id="ns-norm-inf-katex"></span>
+                    </label>
+                </div>
+                <div class="flex items-center">
+                    <input id="ns-norm-1" name="ns-norm-option" type="radio" value="1" class="h-4 w-4 text-yellow-600 border-gray-300 focus:ring-yellow-500">
+                    <label for="ns-norm-1" class="ml-2 flex items-center cursor-pointer">
+                        <span class="font-mono text-lg" id="ns-norm-1-katex"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label id="ns-expressions-label" class="block text-sm font-medium text-gray-700">Hệ phương trình F(X) = 0 (dạng LaTeX)</label>
+                <textarea id="ns-expressions-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="x_1^2 + x_2^2 - 1&#10;x_1^2 - x_2"></textarea>
+                
+                <div id="ns-latex-preview" class="mt-2 p-3 bg-gray-50 rounded-md min-h-[80px] flex flex-col items-center justify-center text-lg space-y-2"></div>
+                <div id="ns-domain-group" class="mt-4" style="display:none;">
+                     <label class="block text-sm font-medium text-gray-700">Miền hộp D = [a, b] (mỗi miền một dòng cách nhau bằng khoảng trắng)</label>
+                     <textarea id="ns-domain-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0 1&#10;0 1"></textarea>
+                </div>
+            </div>
+            <div>
+                 <label for="ns-x0-input" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀ (mỗi giá trị một dòng)</label>
+                 <textarea id="ns-x0-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0.5&#10;0.5"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-8 mb-8">
+        <button id="calculate-ns-btn" class="action-btn bg-yellow-600 hover:bg-yellow-700">Giải Hệ Phi Tuyến</button>
+    </div>
+
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<div id="matrix-solve-iterative-page" class="hidden">
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <button data-tab="jacobi-gs" class="iter-hpt-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">
+                Jacobi & Gauss-Seidel
+            </button>
+            <button data-tab="simple-iteration" class="iter-hpt-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">
+                Lặp Đơn (X = BX + d)
+            </button>
+        </nav>
+    </div>
+    <div id="iter-hpt-jacobi-gs-content" class="iter-hpt-tab-content">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label for="matrix-a-input-iter" class="block text-sm font-medium text-gray-700">Ma trận A (chéo trội để đảm bảo hội tụ)</label>
+                <textarea id="matrix-a-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="10 -1 2 0&#10;-1 11 -1 3&#10;2 -1 10 -1&#10;0 3 -1 8"></textarea>
+            </div>
+            <div>
+                <label for="matrix-b-input-iter" class="block text-sm font-medium text-gray-700">Vector b</label>
+                <textarea id="matrix-b-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-3 font-mono" placeholder="6 1&#10;25 2&#10;-11 3&#10;15 4"></textarea>
+            </div>
+        </div>
+        <div class="mb-6">
+            <label for="x0-input-iter" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀ (mỗi giá trị một dòng)</label>
+            <textarea id="x0-input-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0 0&#10;0 0&#10;0 0&#10;0 0"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="iter-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                <input id="iter-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.0001">
+            </div>
+            <div>
+                <label for="iter-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                <input id="iter-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+            </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <button id="calculate-jacobi-btn" class="action-btn bg-teal-600 hover:bg-teal-700">Jacobi</button>
+            <button id="calculate-gs-btn" class="action-btn bg-sky-600 hover:bg-sky-700">Gauss-Seidel</button>
+        </div>
+    </div>
+    <div id="iter-hpt-simple-iteration-content" class="iter-hpt-tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label for="matrix-b-input-simple-iter" class="block text-sm font-medium text-gray-700">Ma trận lặp B</label>
+                <textarea id="matrix-b-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 font-mono" placeholder="0 0.1 -0.2 0&#10;0.0909 0 0.0909 -0.2727&#10;-0.2 0.1 0 0.1&#10;0 -0.375 0.125 0"></textarea>
+            </div>
+            <div>
+                <label for="matrix-d-input-simple-iter" class="block text-sm font-medium text-gray-700">Vector d</label>
+                <textarea id="matrix-d-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 font-mono" placeholder="0.6&#10;2.2727&#10;-1.1&#10;1.875"></textarea>
+            </div>
+        </div>
+        <div class="mb-6">
+            <label for="x0-input-simple-iter" class="block text-sm font-medium text-gray-700">Vector lặp ban đầu X₀</label>
+            <textarea id="x0-input-simple-iter" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-mono p-2" placeholder="0&#10;0&#10;0&#10;0"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label for="simple-iter-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+                <input id="simple-iter-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.0001">
+            </div>
+            <div>
+                <label for="simple-iter-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa</label>
+                <input id="simple-iter-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+            </div>
+            <div>
+                <label for="simple-iter-norm-choice" class="block text-sm font-medium text-gray-700">Chuẩn tính toán</label>
+                 <select id="simple-iter-norm-choice" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2">
+                    <option value="inf" selected>Chuẩn vô cùng (hàng)</option>
+                    <option value="1">Chuẩn 1 (cột)</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 mb-8">
+            <button id="calculate-simple-iteration-btn" class="action-btn bg-rose-600 hover:bg-rose-700">Tính bằng Lặp Đơn</button>
+        </div>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+<div id="polynomial-solve-page" class="hidden">
+    <div class="space-y-6">
+        <div>
+            <label for="poly-coeffs-input" class="block text-sm font-medium text-gray-700">Nhập các hệ số của đa thức (từ bậc cao đến thấp, cách nhau bằng dấu cách)</label>
+            <input id="poly-coeffs-input" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm p-2 font-mono" placeholder="1 3 -11 -3 10">
+            <p class="mt-2 text-xs text-gray-500">Ví dụ: `1 3 -11 -3 10` tương ứng với đa thức `x^4 + 3x^3 - 11x^2 - 3x + 10 = 0`</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-6 border-t pt-6">
+        <div>
+            <label for="poly-tolerance" class="block text-sm font-medium text-gray-700">Sai số (ε)</label>
+            <input id="poly-tolerance" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="0.0000001">
+        </div>
+        <div>
+            <label for="poly-max-iter" class="block text-sm font-medium text-gray-700">Số lần lặp tối đa (cho mỗi nghiệm)</label>
+            <input id="poly-max-iter" type="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2 font-mono" value="100">
+        </div>
+    </div>
+    <div class="mt-8 mb-8">
+        <button id="calculate-poly-btn" class="action-btn bg-purple-600 hover:bg-purple-700">Tìm Nghiệm Thực</button>
+    </div>
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+
+<!-- Tab Ma trận xấp xỉ SVD -->
+<div id="matrix-approximation-page" class="hidden">
+    <div class="mb-6">
+        <label for="matrix-a-input-approx" class="block text-sm font-medium text-gray-700">Ma trận A</label>
+        <textarea id="matrix-a-input-approx" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 font-mono" placeholder="1 2 3&#10;4 5 6&#10;7 8 9"></textarea>
+    </div>
+    
+    <div class="mb-6">
+        <label for="approx-method-select" class="block text-sm font-medium text-gray-700">Phương pháp xấp xỉ</label>
+        <select id="approx-method-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2">
+            <option value="rank-k">Xấp xỉ rank-k (k giá trị kỳ dị lớn nhất)</option>
+            <option value="threshold">Xấp xỉ theo ngưỡng (giá trị kỳ dị > ngưỡng)</option>
+            <option value="error-bound">Xấp xỉ theo sai số (sai số < giới hạn)</option>
+        </select>
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ rank-k -->
+    <div id="rank-k-options" class="mb-6">
+        <label for="rank-k-value" class="block text-sm font-medium text-gray-700">Giá trị k (số thành phần giữ lại)</label>
+        <input id="rank-k-value" type="number" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="2" value="2">
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ theo ngưỡng -->
+    <div id="threshold-options" class="mb-6 hidden">
+        <label for="threshold-value" class="block text-sm font-medium text-gray-700">Ngưỡng giá trị kỳ dị</label>
+        <input id="threshold-value" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="1e-10" value="1e-10">
+    </div>
+
+    <!-- Tùy chọn cho xấp xỉ theo sai số -->
+    <div id="error-bound-options" class="mb-6 hidden">
+        <label for="error-bound-value" class="block text-sm font-medium text-gray-700">Sai số tối đa (chuẩn Frobenius)</label>
+        <input id="error-bound-value" type="number" step="any" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-400 sm:text-sm p-2" placeholder="0.1" value="0.1">
+    </div>
+
+    <div class="mb-6">
+        <button id="calculate-approximation-btn" class="action-btn bg-green-600 hover:bg-green-700">Tính ma trận xấp xỉ</button>
+    </div>
+    
+    <div id="loading-spinner" class="text-center my-6 hidden"><p class="text-lg font-medium">Đang tính toán...</p></div>
+    <div id="error-message" class="text-center text-red-600 bg-red-100 p-4 rounded-md my-6 hidden"></div>
+    <div id="results-area"></div>
+</div>
+</body>
+</html>

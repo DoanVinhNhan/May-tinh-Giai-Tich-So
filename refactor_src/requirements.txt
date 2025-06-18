@@ -1,0 +1,11 @@
+# Web Framework
+flask==3.0.3
+flask-cors==4.0.1
+
+# Numerical and Symbolic Computation
+numpy==1.26.4
+sympy==1.12
+scipy
+pandas
+# Production Web Server (Optional, but good practice)
+gunicorn==22.0.0
